@@ -1,8 +1,9 @@
 import { Employee, CutiBKNRecord, KGBRecord, MonthlyAttendance, PerjalananDinasRecord } from '../types';
 import { getAccessToken } from './googleAuth';
 import { initialRekapCuti, RekapCutiItem, REKAP_CUTI_SPREADSHEET_ID, REKAP_CUTI_SPREADSHEET_URL } from '../data/rekapCutiData';
+import { initialPegawaiSpreadsheetData, PEGAWAI_SPREADSHEET_ID, PEGAWAI_SPREADSHEET_URL } from '../data/pegawaiSpreadsheetData';
 
-export { initialRekapCuti, REKAP_CUTI_SPREADSHEET_ID, REKAP_CUTI_SPREADSHEET_URL };
+export { initialRekapCuti, REKAP_CUTI_SPREADSHEET_ID, REKAP_CUTI_SPREADSHEET_URL, PEGAWAI_SPREADSHEET_ID, PEGAWAI_SPREADSHEET_URL };
 export type { RekapCutiItem };
 
 export interface SheetTableData {
@@ -23,16 +24,35 @@ export interface GoogleSheetsDatabaseState {
   isConnected: boolean;
 }
 
-export const DEFAULT_SPREADSHEET_ID = REKAP_CUTI_SPREADSHEET_ID;
+export const DEFAULT_SPREADSHEET_ID = PEGAWAI_SPREADSHEET_ID;
 
 // Default initial dataset structured for Google Sheets display in preview
 export const INITIAL_SHEETS_DATABASE: GoogleSheetsDatabaseState = {
-  spreadsheetId: REKAP_CUTI_SPREADSHEET_ID,
-  spreadsheetTitle: 'Rekap Cuti ASN 2026',
-  spreadsheetUrl: REKAP_CUTI_SPREADSHEET_URL,
+  spreadsheetId: PEGAWAI_SPREADSHEET_ID,
+  spreadsheetTitle: 'Database Pegawai & Berkas Dokumen ASN (Google Spreadsheet)',
+  spreadsheetUrl: PEGAWAI_SPREADSHEET_URL,
   lastSynced: '13 September 2026 14:00 WIT',
   isConnected: true,
   sheets: {
+    Data_Pegawai: {
+      sheetName: 'Data_Pegawai',
+      headers: ['No', 'NIP', 'Nama Pegawai', 'Jabatan', 'Satker / Pelayanan', 'Pangkat / Gol', 'Masa Kerja', 'TMT Pangkat', 'TMT KGB', 'Angka Kredit (PAK)', 'Link Google Drive', 'Status Berkas'],
+      rows: initialPegawaiSpreadsheetData.map((r) => [
+        String(r.no),
+        r.nip,
+        r.nama,
+        r.jabatan,
+        r.satuanPelayanan,
+        r.pangkatDetail || r.pangkat,
+        r.masaKerja,
+        r.tmtPangkat,
+        r.tmtKGB,
+        String(r.angkaKredit || '-'),
+        r.linkDrive || '',
+        r.kelengkapanBerkas,
+      ]),
+      updatedAt: '13 September 2026 14:00 WIT',
+    },
     Rekap_Cuti: {
       sheetName: 'Rekap_Cuti',
       headers: ['No', 'NIP', 'Nama Pegawai', 'Cuti N (2026)', 'Cuti N-1 (2025)', 'Cuti N-2 (2024)', 'Jumlah Hak Cuti', 'Terpakai (Hari)', 'Sisa Cuti', 'Status'],
@@ -49,19 +69,6 @@ export const INITIAL_SHEETS_DATABASE: GoogleSheetsDatabaseState = {
         item.sisaCuti > 10 ? 'Aman' : item.sisaCuti > 0 ? 'Tersedia' : 'Habis'
       ]),
       updatedAt: '13 September 2026 14:00 WIT',
-    },
-    Data_Pegawai: {
-      sheetName: 'Data_Pegawai',
-      headers: ['NIP', 'Nama Lengkap', 'Jabatan', 'Pangkat / Golongan', 'Unit Kerja', 'Status', 'Gaji Pokok', 'Sisa Cuti N', 'Email Dinas', 'No. Telepon'],
-      rows: [
-        ['19850714 201001 1 003', 'Rahmat Hidayat, S.Kom., M.T.', 'Pranata Komputer Ahli Muda', 'Penata Tingkat I / III/d', 'Biro Sumber Daya Manusia dan Umum', 'PNS', 'Rp 4.250.000', '10 Hari', 'rahmat.hidayat@instansi.go.id', '0812-3456-7890'],
-        ['19920315 201802 2 004', 'Siti Nurhaliza, S.E.', 'Analis SDM Aparatur', 'Penata Muda / III/a', 'Biro Sumber Daya Manusia dan Umum', 'PNS', 'Rp 3.500.000', '12 Hari', 'siti.nurhaliza@instansi.go.id', '0813-9876-5432'],
-        ['19781120 200501 1 002', 'Budi Santoso, S.Sos., M.AP.', 'Kepala Subbagian Mutasi & Karir', 'Pembina / IV/a', 'Biro Sumber Daya Manusia dan Umum', 'PNS', 'Rp 5.100.000', '8 Hari', 'budi.santoso@instansi.go.id', '0811-2233-4455'],
-        ['19950618 202203 2 005', 'Dewi Lestari, S.A.P.', 'Pengadministrasi Kepegawaian', 'Penata Muda / III/a', 'Biro Keuangan dan BMN', 'PPPK', 'Rp 3.200.000', '12 Hari', 'dewi.lestari@instansi.go.id', '0857-1122-3344'],
-        ['19820410 200801 1 001', 'Ir. Hendra Gunawan, M.Si.', 'Pranata Komputer Madya', 'Pembina Tingkat I / IV/b', 'Pusat Data dan Informasi', 'PNS', 'Rp 5.600.000', '11 Hari', 'hendra.gunawan@instansi.go.id', '0812-9988-7766'],
-        ['19971005 202401 2 001', 'Anisa Rahmawati, S.Tr.Kom', 'Pranata Komputer Terampil', 'Pengatur / II/c', 'Pusat Data dan Informasi', 'PNS', 'Rp 2.800.000', '12 Hari', 'anisa.rahma@instansi.go.id', '0812-7766-5544'],
-      ],
-      updatedAt: '07 September 2026 17:00 WIB',
     },
     Pengajuan_Cuti: {
       sheetName: 'Pengajuan_Cuti',

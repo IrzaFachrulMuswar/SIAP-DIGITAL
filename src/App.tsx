@@ -27,6 +27,11 @@ import {
   initialSyncLogs, 
   initialUserSession 
 } from './data/initialData';
+import { 
+  fetchLivePegawaiSpreadsheet, 
+  convertSpreadsheetToEmployees, 
+  PEGAWAI_SPREADSHEET_ID 
+} from './data/pegawaiSpreadsheetData';
 
 import { Navbar } from './components/Navbar';
 import { Sidebar, NavTab } from './components/Sidebar';
@@ -52,8 +57,40 @@ export default function App() {
   const [isSidebarMobileOpen, setIsSidebarMobileOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
 
-  // Core Data Lists
-  const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
+  // Core Data Lists (Terintegrasi ke Google Spreadsheet ID: 1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M)
+  const [employees, setEmployees] = useState<Employee[]>(() => {
+    try {
+      const cached = localStorage.getItem('pegawai_spreadsheet_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return convertSpreadsheetToEmployees(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading pegawai cache', e);
+    }
+    return initialEmployees;
+  });
+
+  // Auto-sync database pegawai live dari Google Spreadsheet ID: 1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M
+  useEffect(() => {
+    let isMounted = true;
+    fetchLivePegawaiSpreadsheet(PEGAWAI_SPREADSHEET_ID)
+      .then((fresh) => {
+        if (isMounted && fresh && fresh.length > 0) {
+          localStorage.setItem('pegawai_spreadsheet_cache', JSON.stringify(fresh));
+          const converted = convertSpreadsheetToEmployees(fresh);
+          setEmployees(converted);
+        }
+      })
+      .catch((err) => {
+        console.warn('Background sync with live employee spreadsheet:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
   const [attendances, setAttendances] = useState<MonthlyAttendance[]>(initialAttendances);
   const [kgbList, setKgbList] = useState<KGBRecord[]>(initialKGB);
   const [kpList, setKpList] = useState<KenaikanPangkatRecord[]>(initialKP);

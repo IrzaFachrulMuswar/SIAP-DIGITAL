@@ -12,219 +12,24 @@ import {
   SyncLog,
   UserSession 
 } from '../types';
+import { initialPegawaiSpreadsheetData, convertSpreadsheetToEmployees } from './pegawaiSpreadsheetData';
 
 export const initialUserSession: UserSession = {
   isLoggedIn: true,
-  name: 'Drs. H. Bambang Suhartono, M.Si.',
-  nip: '19750814 200003 1 002',
-  email: 'bambang.suhartono@instansi.go.id',
+  name: 'Mila Yasni Morintoh, S.P.',
+  nip: '197501222006042023',
+  email: 'mila.morintoh@karantinaindonesia.go.id',
   role: 'ADMIN_SDM',
-  jabatan: 'Kepala Bagian Kepegawaian & Tata Usaha',
-  unitKerja: 'Biro Sumber Daya Manusia dan Umum',
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+  jabatan: 'Kepala Subbagian Umum',
+  unitKerja: 'Balai Karantina Hewan, Ikan, dan Tumbuhan Papua',
+  avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
   ssoProvider: 'SSO Korporat BKN & SIMPEG Enterprise',
   is2FAEnabled: true,
   is2FAVerified: true,
 };
 
-export const initialEmployees: Employee[] = [
-  {
-    id: 'EMP-001',
-    nip: '19820412 200801 1 005',
-    nama: 'Rahmat Hidayat',
-    gelarDepan: 'Dr.',
-    gelarBelakang: 'S.Kom., M.T.',
-    jabatan: 'Pranata Komputer Ahli Madya',
-    pangkatGolongan: 'Pembina / IV/a',
-    unitKerja: 'Pusat Data dan Informasi Kepegawaian',
-    statusPegawai: 'PNS',
-    email: 'rahmat.hidayat@instansi.go.id',
-    telepon: '0812-8899-2311',
-    alamat: 'Jl. Merpati Putih No. 42, Kebayoran Baru, Jakarta Selatan',
-    tmtPNS: '2008-01-01',
-    jenisKelamin: 'Laki-laki',
-    tanggalLahir: '1982-04-12',
-    pendidikanTerakhir: 'S3 Ilmu Komputer - Universitas Indonesia',
-    gajiPokok: 4850000,
-    fotoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    sisaCutiN2: 0,
-    sisaCutiN1: 3,
-    sisaCutiN: 12,
-    createdAt: '2024-01-10',
-    updatedAt: '2026-03-01',
-    dokumen: [
-      {
-        id: 'DOC-101',
-        employeeId: 'EMP-001',
-        jenisDokumen: 'KTP',
-        namaFile: 'KTP_Rahmat_Hidayat.pdf',
-        ukuran: '420 KB',
-        tanggalUpload: '2025-01-15',
-        keterangan: 'KTP Elektronik Terverifikasi Dukcapil'
-      },
-      {
-        id: 'DOC-102',
-        employeeId: 'EMP-001',
-        jenisDokumen: 'NPWP',
-        namaFile: 'NPWP_Rahmat_Hidayat.pdf',
-        ukuran: '310 KB',
-        tanggalUpload: '2025-01-15',
-        keterangan: 'NPWP 16 Digit Format Baru'
-      },
-      {
-        id: 'DOC-103',
-        employeeId: 'EMP-001',
-        jenisDokumen: 'SK PNS',
-        namaFile: 'SK_PNS_198204122008011005.pdf',
-        ukuran: '1.2 MB',
-        tanggalUpload: '2024-02-10',
-        keterangan: 'SK Pengangkatan PNS BKN'
-      },
-      {
-        id: 'DOC-104',
-        employeeId: 'EMP-001',
-        jenisDokumen: 'Ijazah Terakhir',
-        namaFile: 'Ijazah_S3_Doktor_UI.pdf',
-        ukuran: '2.4 MB',
-        tanggalUpload: '2024-03-01',
-        keterangan: 'Ijazah & Transkrip S3 Terakreditasi Unggul'
-      }
-    ]
-  },
-  {
-    id: 'EMP-002',
-    nip: '19890918 201402 2 003',
-    nama: 'Siti Nurhaliza',
-    gelarDepan: '',
-    gelarBelakang: 'S.E., M.Ak.',
-    jabatan: 'Analis Pengelolaan Keuangan APBN Ahli Muda',
-    pangkatGolongan: 'Penata / III/c',
-    unitKerja: 'Bagian Perbendaharaan dan Gaji',
-    statusPegawai: 'PNS',
-    email: 'siti.nurhaliza@instansi.go.id',
-    telepon: '0813-7744-9912',
-    alamat: 'Komplek Griya Asri Blok D3 No. 12, Bekasi Barat',
-    tmtPNS: '2014-02-01',
-    jenisKelamin: 'Perempuan',
-    tanggalLahir: '1989-09-18',
-    pendidikanTerakhir: 'S2 Akuntansi - Universitas Gadjah Mada',
-    gajiPokok: 3950000,
-    fotoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-    sisaCutiN2: 0,
-    sisaCutiN1: 2,
-    sisaCutiN: 9,
-    createdAt: '2024-01-10',
-    updatedAt: '2026-03-02',
-    dokumen: [
-      {
-        id: 'DOC-201',
-        employeeId: 'EMP-002',
-        jenisDokumen: 'KTP',
-        namaFile: 'KTP_Siti_Nurhaliza.pdf',
-        ukuran: '380 KB',
-        tanggalUpload: '2025-02-12',
-        keterangan: 'e-KTP Asli'
-      },
-      {
-        id: 'DOC-202',
-        employeeId: 'EMP-002',
-        jenisDokumen: 'SK PNS',
-        namaFile: 'SK_PNS_Siti_Nurhaliza.pdf',
-        ukuran: '1.4 MB',
-        tanggalUpload: '2024-05-18',
-        keterangan: 'SK Penata III/c'
-      }
-    ]
-  },
-  {
-    id: 'EMP-003',
-    nip: '19930722 201903 1 004',
-    nama: 'Budi Santoso',
-    gelarDepan: '',
-    gelarBelakang: 'S.AP., M.Si.',
-    jabatan: 'Analis Kepegawaian Ahli Pertama',
-    pangkatGolongan: 'Penata Muda Tk.I / III/b',
-    unitKerja: 'Subbag Mutasi dan Promosi SDM',
-    statusPegawai: 'PNS',
-    email: 'budi.santoso@instansi.go.id',
-    telepon: '0852-1122-3344',
-    alamat: 'Jl. Kemuning Raya No. 18, Rawamangun, Jakarta Timur',
-    tmtPNS: '2019-03-01',
-    jenisKelamin: 'Laki-laki',
-    tanggalLahir: '1993-07-22',
-    pendidikanTerakhir: 'S2 Administrasi Publik - LAN RI',
-    gajiPokok: 3420000,
-    fotoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    sisaCutiN2: 1,
-    sisaCutiN1: 4,
-    sisaCutiN: 11,
-    createdAt: '2024-02-01',
-    updatedAt: '2026-03-03',
-    dokumen: [
-      {
-        id: 'DOC-301',
-        employeeId: 'EMP-003',
-        jenisDokumen: 'Kartu Pegawai (KARPEG)',
-        namaFile: 'KARPEG_Budi_Santoso.pdf',
-        ukuran: '520 KB',
-        tanggalUpload: '2025-01-20',
-        keterangan: 'Kartu ASN Virtual BKN'
-      }
-    ]
-  },
-  {
-    id: 'EMP-004',
-    nip: '19961105 202203 2 008',
-    nama: 'Dewi Anggraini',
-    gelarDepan: '',
-    gelarBelakang: 'S.Stat.',
-    jabatan: 'Statistisi Ahli Pertama',
-    pangkatGolongan: 'Penata Muda / III/a',
-    unitKerja: 'Subbag Perencanaan dan Program',
-    statusPegawai: 'PNS',
-    email: 'dewi.anggraini@instansi.go.id',
-    telepon: '0878-9900-1123',
-    alamat: 'Apartemen Kalibata City Tower Kemuning, Jakarta Selatan',
-    tmtPNS: '2022-03-01',
-    jenisKelamin: 'Perempuan',
-    tanggalLahir: '1996-11-05',
-    pendidikanTerakhir: 'S1 Statistika - Institut Teknologi Sepuluh Nopember',
-    gajiPokok: 3050000,
-    fotoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-    sisaCutiN2: 0,
-    sisaCutiN1: 0,
-    sisaCutiN: 12,
-    createdAt: '2024-03-15',
-    updatedAt: '2026-03-04',
-    dokumen: []
-  },
-  {
-    id: 'EMP-005',
-    nip: '19901201 202321 1 001',
-    nama: 'Ahmad Faisal',
-    gelarDepan: '',
-    gelarBelakang: 'A.Md.Kom.',
-    jabatan: 'Pranata Komputer Terampil',
-    pangkatGolongan: 'Pengatur / II/c (PPPK)',
-    unitKerja: 'Pusat Data dan Informasi Kepegawaian',
-    statusPegawai: 'PPPK',
-    email: 'ahmad.faisal@instansi.go.id',
-    telepon: '0821-4567-8901',
-    alamat: 'Jl. Cempaka Putih Tengah No. 5, Jakarta Pusat',
-    tmtPNS: '2023-04-01',
-    jenisKelamin: 'Laki-laki',
-    tanggalLahir: '1990-12-01',
-    pendidikanTerakhir: 'D3 Manajemen Informatika - Politeknik Negeri Jakarta',
-    gajiPokok: 2980000,
-    fotoUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
-    sisaCutiN2: 0,
-    sisaCutiN1: 2,
-    sisaCutiN: 10,
-    createdAt: '2024-04-01',
-    updatedAt: '2026-03-01',
-    dokumen: []
-  }
-];
+// Master database pegawai diinisialisasi dari Google Spreadsheet ID: 1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M (63 Pegawai ASN BKHIT)
+export const initialEmployees: Employee[] = convertSpreadsheetToEmployees(initialPegawaiSpreadsheetData);
 
 export const initialMonthlyAttendances: MonthlyAttendance[] = [
   {

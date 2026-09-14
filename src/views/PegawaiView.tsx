@@ -218,6 +218,10 @@ export const PegawaiView: React.FC<PegawaiViewProps> = ({
         const timeStr = `Sinkronisasi Live: ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB`;
         setLastSyncTime(timeStr);
         localStorage.setItem('pegawai_last_sync_time', timeStr);
+        if (onImportEmployeesFromSheet) {
+          const converted = convertSpreadsheetToEmployees(freshData);
+          onImportEmployeesFromSheet(converted);
+        }
       }
     } catch (err) {
       console.error('Failed to sync employee spreadsheet:', err);

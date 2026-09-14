@@ -1311,7 +1311,7 @@ export function convertSpreadsheetToEmployees(records: PegawaiSpreadsheetRecord[
     }
 
     return {
-      id: `EMP-SHT-${String(idx + 1).padStart(3, '0')}`,
+      id: `EMP-${String(idx + 1).padStart(3, '0')}`,
       nip: r.nip,
       nama: r.nama,
       gelarDepan: '',
