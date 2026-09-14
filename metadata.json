@@ -1,0 +1,6 @@
+{
+  "name": "Sistem Informasi Kepegawaian & Keuangan",
+  "description": "Aplikasi terintegrasi Kepegawaian (Cuti BKN No. 24/2017, KGB, KP, PAK/SKP, 2FA, SSO, Sinkronisasi SDM), Keuangan (SPPD, Lembur, SPP/SPM/SP2D), dan Integrasi Database Google Spreadsheet.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
