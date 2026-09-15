@@ -1,8 +1,8 @@
 import { MonthlyAttendance } from '../types';
 import { initialPegawaiSpreadsheetData } from './pegawaiSpreadsheetData';
 
-// Google Spreadsheet Presensi ID: 16q5aZkFJzZ5RNpGOxLTR28AntgGIsc9ecQ9XYRlCDJY
-export const ABSENSI_SPREADSHEET_ID = '16q5aZkFJzZ5RNpGOxLTR28AntgGIsc9ecQ9XYRlCDJY';
+// Google Spreadsheet Presensi & Rekap Absen ID: 1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M
+export const ABSENSI_SPREADSHEET_ID = '1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M';
 export const ABSENSI_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${ABSENSI_SPREADSHEET_ID}/edit?usp=sharing`;
 export const ABSENSI_SPREADSHEET_EMBED_URL = `https://docs.google.com/spreadsheets/d/${ABSENSI_SPREADSHEET_ID}/htmlembed?widget=true&headers=false`;
 

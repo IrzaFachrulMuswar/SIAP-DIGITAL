@@ -11,7 +11,8 @@ import {
   Shield, 
   Database,
   ChevronRight,
-  TrendingUp
+  TrendingUp,
+  UtensilsCrossed
 } from 'lucide-react';
 
 export type NavTab = 
@@ -22,6 +23,7 @@ export type NavTab =
   | 'cuti'
   | 'sppd'
   | 'lembur'
+  | 'uang_makan'
   | 'perbendaharaan'
   | 'sheets_db'
   | 'sync'
@@ -111,6 +113,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: Clock,
           badge: null,
           color: 'text-violet-600',
+        },
+        {
+          id: 'uang_makan' as NavTab,
+          label: 'Uang Makan Pegawai',
+          icon: UtensilsCrossed,
+          badge: null,
+          color: 'text-amber-600',
         },
         {
           id: 'perbendaharaan' as NavTab,

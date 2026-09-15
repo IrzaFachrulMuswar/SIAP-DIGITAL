@@ -111,6 +111,18 @@ export const INITIAL_SHEETS_DATABASE: GoogleSheetsDatabaseState = {
       ],
       updatedAt: '07 September 2026 15:50 WIB',
     },
+    Uang_Makan: {
+      sheetName: 'Uang_Makan',
+      headers: ['No', 'Periode', 'NIP', 'Nama Pegawai', 'Golongan', 'Hari Hadir', 'Tarif / Hari', 'Bruto', 'PPh 21', 'Netto', 'Bank & Rekening', 'Status SP2D'],
+      rows: [
+        ['1', 'Agustus 2026', '19750122 200604 2 023', 'Mila Yasni Morintoh, S.P.', 'IV/a', '21', 'Rp 41.000', 'Rp 861.000', 'Rp 129.150', 'Rp 731.850', 'Bank Mandiri - 102-00-202611-8', 'SP2D Terbit / Cair'],
+        ['2', 'Agustus 2026', '19800415 200501 1 004', 'Drh. Bambang Triyono', 'IV/b', '20', 'Rp 41.000', 'Rp 820.000', 'Rp 123.000', 'Rp 697.000', 'Bank BRI - 0011-01-000456-30-2', 'SP2D Terbit / Cair'],
+        ['3', 'Agustus 2026', '19850714 201001 1 003', 'Rahmat Hidayat, S.Kom., M.T.', 'III/d', '22', 'Rp 37.000', 'Rp 814.000', 'Rp 40.700', 'Rp 773.300', 'Bank BNI - 137-00-112233-4', 'SP2D Terbit / Cair'],
+        ['4', 'Agustus 2026', '19920315 201802 2 004', 'Siti Nurhaliza, S.E.', 'III/a', '20', 'Rp 37.000', 'Rp 740.000', 'Rp 37.000', 'Rp 703.000', 'Bank BSI - 712-33-445566-0', 'SPM Terbit'],
+        ['5', 'Agustus 2026', '19950618 202203 2 005', 'Dewi Lestari, S.A.P.', 'II/c', '21', 'Rp 35.000', 'Rp 735.000', 'Rp 0', 'Rp 735.000', 'Bank Mandiri - 102-00-334455-9', 'Diverifikasi Bendahara'],
+      ],
+      updatedAt: '15 September 2026 09:00 WIT',
+    },
   },
 };
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Briefcase, 
   Clock, 
@@ -14,12 +14,34 @@ import {
   MapPin, 
   DollarSign,
   Calendar,
-  UserCheck
+  UserCheck,
+  FolderOpen,
+  ExternalLink,
+  Copy,
+  Check,
+  Eye,
+  Paperclip
 } from 'lucide-react';
-import { PerjalananDinasRecord, LemburRecord, Employee } from '../types';
+import { PerjalananDinasRecord, LemburRecord, Employee, LampiranDokumen } from '../types';
 import { formatRupiah, exportSPPDPDF, exportToExcel } from '../utils/exportUtils';
+import { FileUploadZone } from '../components/FileUploadZone';
+import { DocumentViewerModal } from '../components/DocumentViewerModal';
+
+export const SPPD_GOOGLE_DRIVE_URL = 'https://drive.google.com/drive/folders/1cjqUhafgThFWGnM3QbWllh1TQmozJwLr';
+
+// Google Spreadsheet Laporan Perjalanan Dinas (SPD) ID: 1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M (gid: 271751341)
+export const SPPD_SPREADSHEET_ID = '1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M';
+export const SPPD_SPREADSHEET_GID = '271751341';
+export const SPPD_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${SPPD_SPREADSHEET_ID}/edit?gid=${SPPD_SPREADSHEET_GID}#gid=${SPPD_SPREADSHEET_GID}`;
+export const SPPD_SPREADSHEET_EMBED_URL = `https://docs.google.com/spreadsheets/d/${SPPD_SPREADSHEET_ID}/htmlembed?gid=${SPPD_SPREADSHEET_GID}&widget=true&headers=false`;
+
+// Google Spreadsheet Rekap Absen & Laporan Lembur ID: 1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M
+export const LEMBUR_SPREADSHEET_ID = '1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M';
+export const LEMBUR_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${LEMBUR_SPREADSHEET_ID}/edit?usp=sharing`;
+export const LEMBUR_SPREADSHEET_EMBED_URL = `https://docs.google.com/spreadsheets/d/${LEMBUR_SPREADSHEET_ID}/htmlembed?widget=true&headers=false`;
 
 interface KeuanganSppdViewProps {
+  initialTab?: 'sppd' | 'lembur';
   sppdList: PerjalananDinasRecord[];
   lemburList: LemburRecord[];
   employees: Employee[];
@@ -33,6 +55,7 @@ interface KeuanganSppdViewProps {
 }
 
 export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
+  initialTab,
   sppdList,
   lemburList,
   employees,
@@ -44,8 +67,37 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
   onDeleteLembur,
   onRequest2FA,
 }) => {
-  const [activeTab, setActiveTab] = useState<'sppd' | 'lembur'>('sppd');
+  const [activeTab, setActiveTab] = useState<'sppd' | 'lembur'>(initialTab || 'sppd');
   const [search, setSearch] = useState('');
+  const [copiedDriveLink, setCopiedDriveLink] = useState(false);
+  const [copiedSppdSpreadsheet, setCopiedSppdSpreadsheet] = useState(false);
+  const [showSppdSheetPreview, setShowSppdSheetPreview] = useState(false);
+  const [copiedLemburSpreadsheet, setCopiedLemburSpreadsheet] = useState(false);
+  const [showLemburSheetPreview, setShowLemburSheetPreview] = useState(false);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  const handleCopyDriveLink = () => {
+    navigator.clipboard.writeText(SPPD_GOOGLE_DRIVE_URL);
+    setCopiedDriveLink(true);
+    setTimeout(() => setCopiedDriveLink(false), 2500);
+  };
+
+  const handleCopySppdSpreadsheet = () => {
+    navigator.clipboard.writeText(SPPD_SPREADSHEET_URL);
+    setCopiedSppdSpreadsheet(true);
+    setTimeout(() => setCopiedSppdSpreadsheet(false), 2500);
+  };
+
+  const handleCopyLemburSpreadsheet = () => {
+    navigator.clipboard.writeText(LEMBUR_SPREADSHEET_URL);
+    setCopiedLemburSpreadsheet(true);
+    setTimeout(() => setCopiedLemburSpreadsheet(false), 2500);
+  };
 
   // SPPD Modal State
   const [isSppdModalOpen, setIsSppdModalOpen] = useState(false);
@@ -75,6 +127,7 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
     pejabatPembuatKomitmen: 'Drs. H. Mulyadi, M.Si.',
     nipPPK: '19710815 199603 1 003',
     status: 'Disetujui PPK',
+    dokumen: [],
   });
 
   // Lembur Modal State
@@ -94,6 +147,20 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
     uangMakan: 37000,
     totalUangLembur: 157000,
     status: 'Disetujui Atasan',
+    dokumen: [],
+  });
+
+  // Document Viewer Modal State
+  const [viewingDocs, setViewingDocs] = useState<{
+    isOpen: boolean;
+    title: string;
+    subtitle?: string;
+    documents: LampiranDokumen[];
+  }>({
+    isOpen: false,
+    title: '',
+    subtitle: '',
+    documents: [],
   });
 
   // Calculations for SPPD Form
@@ -255,32 +322,401 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
           </div>
 
           {activeTab === 'sppd' ? (
-            <button
-              type="button"
-              onClick={() => {
-                setIsEditingSppd(false);
-                setIsSppdModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors cursor-pointer"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Buat SPPD Baru</span>
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <a
+                id="btn-google-sheets-sppd-top"
+                href={SPPD_SPREADSHEET_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/90 hover:bg-emerald-100 px-3.5 py-2 text-xs font-bold text-emerald-700 transition-colors shadow-xs"
+                title="Buka Google Spreadsheet Laporan Perjalanan Dinas (SPD)"
+              >
+                <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                <span>Spreadsheet SPD</span>
+                <ExternalLink className="h-3 w-3 text-emerald-500" />
+              </a>
+
+              <a
+                id="btn-google-drive-sppd-top"
+                href={SPPD_GOOGLE_DRIVE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/90 hover:bg-blue-100 px-3.5 py-2 text-xs font-bold text-blue-700 transition-colors shadow-xs"
+                title="Buka Folder Google Drive Laporan Perjalanan Dinas"
+              >
+                <FolderOpen className="h-4 w-4 text-blue-600" />
+                <span>Google Drive SPD</span>
+                <ExternalLink className="h-3 w-3 text-blue-500" />
+              </a>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditingSppd(false);
+                  setSppdForm({
+                    nomorSuratTugas: `ST-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
+                    nomorSPPD: `SPPD-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
+                    employeeId: '',
+                    employeeName: '',
+                    nip: '',
+                    jabatan: '',
+                    tingkatBiaya: 'Tingkat B',
+                    maksudPerjalanan: 'Koordinasi Penyelenggaraan Sistem Informasi ASN',
+                    alatAngkutan: 'Pesawat Udara',
+                    kotaAsal: 'Jakarta',
+                    kotaTujuan: 'Yogyakarta',
+                    lamaHari: 3,
+                    tanggalBerangkat: new Date().toISOString().slice(0, 10),
+                    tanggalKembali: new Date().toISOString().slice(0, 10),
+                    rincianBiaya: {
+                      uangHarian: 1290000,
+                      biayaTransport: 2500000,
+                      biayaPenginapan: 1500000,
+                      uangRepresentasi: 0,
+                      totalBiaya: 5290000,
+                    },
+                    pejabatPembuatKomitmen: 'Drs. H. Mulyadi, M.Si.',
+                    nipPPK: '19710815 199603 1 003',
+                    status: 'Diusulkan',
+                    dokumen: [],
+                  });
+                  setIsSppdModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors cursor-pointer"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Buat SPPD Baru</span>
+              </button>
+            </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setIsEditingLembur(false);
-                setIsLemburModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors cursor-pointer"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Buat Perintah Lembur</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <a
+                id="btn-google-sheets-lembur-top"
+                href={LEMBUR_SPREADSHEET_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/90 hover:bg-emerald-100 px-3.5 py-2 text-xs font-bold text-emerald-700 transition-colors shadow-xs"
+                title="Buka Google Spreadsheet Rekap Absen & Laporan Lembur"
+              >
+                <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                <span>Spreadsheet Lembur</span>
+                <ExternalLink className="h-3 w-3 text-emerald-500" />
+              </a>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditingLembur(false);
+                  setLemburForm({
+                    nomorSuratPerintah: `SPL-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
+                    tanggalLembur: new Date().toISOString().slice(0, 10),
+                    employeeId: '',
+                    employeeName: '',
+                    nip: '',
+                    jamMulai: '17:30',
+                    jamSelesai: '21:30',
+                    jumlahJam: 4,
+                    uraianPekerjaan: '',
+                    tarifPerJam: 30000,
+                    uangMakan: 37000,
+                    totalUangLembur: 157000,
+                    status: 'Diajukan',
+                    dokumen: [],
+                  });
+                  setIsLemburModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors cursor-pointer"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Buat Perintah Lembur</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
+
+      {/* Card Google Spreadsheet Laporan Perjalanan Dinas (SPD) */}
+      {activeTab === 'sppd' && (
+        <div className="rounded-2xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/95 via-teal-50/60 to-cyan-50/40 p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="p-2.5 bg-emerald-600 text-white rounded-xl shadow-xs shrink-0 mt-0.5">
+              <FileSpreadsheet className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900">
+                  Google Spreadsheet Laporan Perjalanan Dinas (SPD)
+                </h3>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Spreadsheet Terhubung (Tab GID: {SPPD_SPREADSHEET_GID})
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                Pencatatan data Surat Tugas, pelaksana SPD, kota tujuan, rincian biaya tiket, penginapan & uang harian riil, serta rekapitulasi SP2D BKHIT.
+              </p>
+              <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-emerald-700 bg-white/90 border border-emerald-200/80 rounded-lg px-2.5 py-1 w-fit max-w-full overflow-hidden text-ellipsis">
+                <span className="text-slate-400">Spreadsheet ID:</span>
+                <span className="truncate font-bold">{SPPD_SPREADSHEET_ID} (gid: {SPPD_SPREADSHEET_GID})</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+            <button
+              type="button"
+              id="btn-toggle-preview-sppd-sheet"
+              onClick={() => setShowSppdSheetPreview(!showSppdSheetPreview)}
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors shadow-2xs cursor-pointer ${
+                showSppdSheetPreview
+                  ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
+                  : 'bg-white border-emerald-200 text-slate-700 hover:bg-emerald-50'
+              }`}
+              title="Tampilkan / Sembunyikan Pratinjau Google Sheets SPD"
+            >
+              <Eye className="h-3.5 w-3.5 text-emerald-600" />
+              <span>{showSppdSheetPreview ? 'Tutup Pratinjau' : 'Pratinjau Sheets'}</span>
+            </button>
+            <button
+              type="button"
+              id="btn-copy-sppd-spreadsheet"
+              onClick={handleCopySppdSpreadsheet}
+              className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 transition-colors shadow-2xs cursor-pointer"
+              title="Salin Link Google Spreadsheet SPD"
+            >
+              {copiedSppdSpreadsheet ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                  <span className="text-emerald-700 font-bold">Tersalin!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5 text-slate-500" />
+                  <span>Salin Link</span>
+                </>
+              )}
+            </button>
+            <a
+              id="btn-open-sppd-spreadsheet-banner"
+              href={SPPD_SPREADSHEET_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              <span>Buka di Google Sheets</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Pratinjau Inline Google Sheets SPD jika dibuka */}
+      {activeTab === 'sppd' && showSppdSheetPreview && (
+        <div className="rounded-2xl border border-emerald-200 bg-white shadow-sm overflow-hidden animate-in fade-in duration-200">
+          <div className="bg-emerald-50/80 px-4 py-2.5 border-b border-emerald-200 text-xs text-slate-700 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+              <span className="font-semibold text-slate-800">Pratinjau Langsung: Google Spreadsheet Laporan SPD (gid: {SPPD_SPREADSHEET_GID})</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <a
+                href={SPPD_SPREADSHEET_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-emerald-700 font-bold hover:underline flex items-center gap-1"
+              >
+                Buka Tab Baru <ExternalLink className="h-3 w-3" />
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowSppdSheetPreview(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-white cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          <iframe
+            src={SPPD_SPREADSHEET_EMBED_URL}
+            className="w-full h-[520px] border-0 bg-white"
+            title="Google Spreadsheet Laporan Perjalanan Dinas (SPD)"
+            loading="lazy"
+          />
+        </div>
+      )}
+
+      {/* Card Folder Google Drive Laporan Perjalanan Dinas */}
+      {activeTab === 'sppd' && (
+        <div className="rounded-2xl border border-blue-200/90 bg-gradient-to-r from-blue-50/95 via-sky-50/60 to-indigo-50/40 p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-xs shrink-0 mt-0.5">
+              <FolderOpen className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900">
+                  Folder Google Drive Laporan Perjalanan Dinas (SPD)
+                </h3>
+                <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800 border border-blue-200">
+                  Cloud Storage Terhubung
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                Penyimpanan berkas digital Surat Tugas, Tiket Pesawat/Kapal, Boarding Pass, Kwitansi Hotel & Riil, serta Laporan Hasil Kegiatan Perjalanan Dinas BKHIT.
+              </p>
+              <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-blue-700 bg-white/90 border border-blue-200/80 rounded-lg px-2.5 py-1 w-fit max-w-full overflow-hidden text-ellipsis">
+                <span className="text-slate-400">Link Drive:</span>
+                <span className="truncate">{SPPD_GOOGLE_DRIVE_URL}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+            <button
+              type="button"
+              id="btn-copy-drive-sppd"
+              onClick={handleCopyDriveLink}
+              className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-blue-50 transition-colors shadow-2xs cursor-pointer"
+              title="Salin Link Google Drive"
+            >
+              {copiedDriveLink ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                  <span className="text-emerald-700 font-bold">Tersalin!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5 text-slate-500" />
+                  <span>Salin Link</span>
+                </>
+              )}
+            </button>
+            <a
+              id="btn-open-drive-sppd-banner"
+              href={SPPD_GOOGLE_DRIVE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
+            >
+              <FolderOpen className="h-4 w-4" />
+              <span>Buka di Google Drive</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Card Google Spreadsheet Rekap Absen & Laporan Lembur */}
+      {activeTab === 'lembur' && (
+        <div className="rounded-2xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/95 via-teal-50/60 to-violet-50/40 p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="p-2.5 bg-emerald-600 text-white rounded-xl shadow-xs shrink-0 mt-0.5">
+              <FileSpreadsheet className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900">
+                  Google Spreadsheet Rekap Absen & Laporan Lembur
+                </h3>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Spreadsheet Terhubung (ID: {LEMBUR_SPREADSHEET_ID})
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                Pencatatan data surat tugas perintah lembur (SPKL), rekapitulasi jam kerja tambahan, kalkulasi tarif PMK, serta uang makan lembur ASN BKHIT.
+              </p>
+              <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-emerald-700 bg-white/90 border border-emerald-200/80 rounded-lg px-2.5 py-1 w-fit max-w-full overflow-hidden text-ellipsis">
+                <span className="text-slate-400">Spreadsheet ID:</span>
+                <span className="truncate font-bold">{LEMBUR_SPREADSHEET_ID}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+            <button
+              type="button"
+              id="btn-toggle-preview-lembur-sheet"
+              onClick={() => setShowLemburSheetPreview(!showLemburSheetPreview)}
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors shadow-2xs cursor-pointer ${
+                showLemburSheetPreview
+                  ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
+                  : 'bg-white border-emerald-200 text-slate-700 hover:bg-emerald-50'
+              }`}
+              title="Tampilkan / Sembunyikan Pratinjau Google Sheets"
+            >
+              <Eye className="h-3.5 w-3.5 text-emerald-600" />
+              <span>{showLemburSheetPreview ? 'Tutup Pratinjau' : 'Pratinjau Sheets'}</span>
+            </button>
+            <button
+              type="button"
+              id="btn-copy-lembur-spreadsheet"
+              onClick={handleCopyLemburSpreadsheet}
+              className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 transition-colors shadow-2xs cursor-pointer"
+              title="Salin Link Google Spreadsheet"
+            >
+              {copiedLemburSpreadsheet ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                  <span className="text-emerald-700 font-bold">Tersalin!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5 text-slate-500" />
+                  <span>Salin Link</span>
+                </>
+              )}
+            </button>
+            <a
+              id="btn-open-lembur-spreadsheet-banner"
+              href={LEMBUR_SPREADSHEET_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              <span>Buka di Google Sheets</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Pratinjau Inline Google Sheets Lembur jika dibuka */}
+      {activeTab === 'lembur' && showLemburSheetPreview && (
+        <div className="rounded-2xl border border-emerald-200 bg-white shadow-sm overflow-hidden animate-in fade-in duration-200">
+          <div className="bg-emerald-50/80 px-4 py-2.5 border-b border-emerald-200 text-xs text-slate-700 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+              <span className="font-semibold text-slate-800">Pratinjau Langsung: Google Spreadsheet (ID: {LEMBUR_SPREADSHEET_ID})</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <a
+                href={LEMBUR_SPREADSHEET_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-emerald-700 font-bold hover:underline flex items-center gap-1"
+              >
+                Buka Tab Baru <ExternalLink className="h-3 w-3" />
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowLemburSheetPreview(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-white cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          <iframe
+            src={LEMBUR_SPREADSHEET_EMBED_URL}
+            className="w-full h-[520px] border-0 bg-white"
+            title="Google Spreadsheet Lembur & Absen"
+            loading="lazy"
+          />
+        </div>
+      )}
 
       {/* SEARCH & EXPORT */}
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
@@ -337,6 +773,27 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
                         <p className="font-bold text-slate-900">{item.employeeName}</p>
                         <p className="text-[11px] text-cyan-700 font-mono font-semibold">{item.nomorSPPD}</p>
                         <p className="text-[10px] text-slate-400 font-mono">NIP: {item.nip}</p>
+                        {item.dokumen && item.dokumen.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setViewingDocs({
+                              isOpen: true,
+                              title: `Berkas Lampiran SPPD: ${item.nomorSPPD || item.nomorSPD}`,
+                              subtitle: `${item.employeeName} (${item.kotaAsal} -> ${item.kotaTujuan})`,
+                              documents: item.dokumen || [],
+                            })}
+                            className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-cyan-50 hover:bg-cyan-100 text-cyan-800 font-bold text-[10px] border border-cyan-200 transition-colors cursor-pointer"
+                            title="Lihat berkas lampiran yang diupload"
+                          >
+                            <Paperclip className="h-3 w-3 text-cyan-600" />
+                            <span>{item.dokumen.length} File Lampiran</span>
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 mt-1 text-[10px] text-slate-400">
+                            <Paperclip className="h-3 w-3 text-slate-300" />
+                            <span>0 Lampiran</span>
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="py-3 px-3">
@@ -383,6 +840,26 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
                           <Printer className="h-3.5 w-3.5" />
                           <span>PDF</span>
                         </button>
+                        <a
+                          href={SPPD_SPREADSHEET_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 p-1.5 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                          title="Buka Data di Google Spreadsheet SPD"
+                        >
+                          <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>Sheet</span>
+                        </a>
+                        <a
+                          href={SPPD_GOOGLE_DRIVE_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 p-1.5 rounded-lg text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+                          title="Buka Folder Google Drive Laporan SPD"
+                        >
+                          <FolderOpen className="h-3.5 w-3.5 text-blue-600" />
+                          <span>Drive</span>
+                        </a>
                         <button
                           type="button"
                           onClick={() => {
@@ -449,6 +926,27 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
                         <p className="font-bold text-slate-900">{lembur.employeeName}</p>
                         <p className="text-[11px] text-slate-500 font-mono">NIP: {lembur.nip}</p>
                         <p className="text-[10px] text-violet-700 font-mono font-semibold">{lembur.nomorSuratPerintah}</p>
+                        {lembur.dokumen && lembur.dokumen.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setViewingDocs({
+                              isOpen: true,
+                              title: `Berkas Lampiran Lembur: ${lembur.nomorSuratPerintah || lembur.nomorSPKL || lembur.id}`,
+                              subtitle: `${lembur.employeeName} (${lembur.tanggalLembur} - ${lembur.jumlahJam} Jam)`,
+                              documents: lembur.dokumen || [],
+                            })}
+                            className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-violet-50 hover:bg-violet-100 text-violet-800 font-bold text-[10px] border border-violet-200 transition-colors cursor-pointer"
+                            title="Lihat berkas lampiran lembur yang diupload"
+                          >
+                            <Paperclip className="h-3 w-3 text-violet-600" />
+                            <span>{lembur.dokumen.length} File Lampiran</span>
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 mt-1 text-[10px] text-slate-400">
+                            <Paperclip className="h-3 w-3 text-slate-300" />
+                            <span>0 Lampiran</span>
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="py-3 px-3">
@@ -483,6 +981,16 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
                     </td>
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-1">
+                        <a
+                          href={LEMBUR_SPREADSHEET_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 p-1.5 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                          title="Buka Data di Google Spreadsheet"
+                        >
+                          <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>Sheet</span>
+                        </a>
                         <button
                           type="button"
                           onClick={() => {
@@ -700,6 +1208,65 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
                 </select>
               </div>
 
+              {/* Form Input Upload Berkas SPPD */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5">
+                <FileUploadZone
+                  label="Form Input Upload Berkas Lampiran SPPD"
+                  sublabel="Surat Tugas, Tiket/Boarding Pass, Kwitansi Hotel, Laporan Hasil Perjalanan (LPJ), Foto Kegiatan (Maks. 10 MB per file)"
+                  categoryOptions={[
+                    'Surat Tugas',
+                    'Tiket / Boarding Pass',
+                    'Kwitansi Hotel',
+                    'Laporan Hasil Perjalanan (LPJ)',
+                    'Foto Dokumentasi',
+                    'Lainnya',
+                  ]}
+                  defaultCategory="Surat Tugas"
+                  documents={sppdForm.dokumen || []}
+                  onChange={(newDocs) => setSppdForm({ ...sppdForm, dokumen: newDocs })}
+                />
+              </div>
+
+              {/* Tautan Google Spreadsheet Data SPD */}
+              <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/70 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs text-slate-700 font-medium">
+                    Google Spreadsheet Data SPD (gid: {SPPD_SPREADSHEET_GID}):
+                  </span>
+                </div>
+                <a
+                  href={SPPD_SPREADSHEET_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-white border border-emerald-200 rounded-lg px-2.5 py-1.5 shrink-0 shadow-2xs w-fit cursor-pointer"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  <span>Buka Spreadsheet</span>
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+
+              {/* Tautan Google Drive Dokumen Bukti & LPJ */}
+              <div className="rounded-xl border border-blue-200/80 bg-blue-50/70 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="h-4 w-4 text-blue-600 shrink-0" />
+                  <span className="text-xs text-slate-700 font-medium">
+                    Folder Google Drive untuk arsip tiket, boarding pass, kwitansi & LPJ:
+                  </span>
+                </div>
+                <a
+                  href={SPPD_GOOGLE_DRIVE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-900 bg-white border border-blue-200 rounded-lg px-2.5 py-1.5 shrink-0 shadow-2xs w-fit cursor-pointer"
+                >
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  <span>Buka Folder Drive</span>
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -848,6 +1415,44 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
                 </select>
               </div>
 
+              {/* Form Input Upload Berkas Lembur */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5">
+                <FileUploadZone
+                  label="Form Input Upload Berkas Lampiran Lembur"
+                  sublabel="Surat Perintah Kerja Lembur (SPKL), Presensi / Kehadiran, Foto Dokumentasi Lembur, Laporan Output Kerja"
+                  categoryOptions={[
+                    'Surat Perintah Kerja Lembur (SPKL)',
+                    'Daftar Hadir / Presensi',
+                    'Foto Dokumentasi Lembur',
+                    'Laporan Hasil Pekerjaan',
+                    'Lainnya',
+                  ]}
+                  defaultCategory="Surat Perintah Kerja Lembur (SPKL)"
+                  documents={lemburForm.dokumen || []}
+                  onChange={(newDocs) => setLemburForm({ ...lemburForm, dokumen: newDocs })}
+                />
+              </div>
+
+              {/* Tautan Google Spreadsheet Rekap Absen & Lembur */}
+              <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/70 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs text-slate-700 font-medium">
+                    Google Spreadsheet Rekap Absen & Lembur (ID: {LEMBUR_SPREADSHEET_ID}):
+                  </span>
+                </div>
+                <a
+                  href={LEMBUR_SPREADSHEET_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-white border border-emerald-200 rounded-lg px-2.5 py-1.5 shrink-0 shadow-2xs w-fit cursor-pointer"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  <span>Buka Spreadsheet</span>
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -867,6 +1472,15 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Document Viewer Modal for inspecting & downloading attachments */}
+      <DocumentViewerModal
+        isOpen={viewingDocs.isOpen}
+        onClose={() => setViewingDocs({ ...viewingDocs, isOpen: false })}
+        title={viewingDocs.title}
+        subtitle={viewingDocs.subtitle}
+        documents={viewingDocs.documents}
+      />
     </div>
   );
 };

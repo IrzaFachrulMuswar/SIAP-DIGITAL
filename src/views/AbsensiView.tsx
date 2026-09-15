@@ -535,7 +535,19 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start md:self-center shrink-0">
+          <div className="flex items-center gap-2 self-start md:self-center shrink-0 flex-wrap">
+            <a
+              id="btn-buka-spreadsheet-absensi"
+              href={ABSENSI_SPREADSHEET_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white transition-colors shadow-xs"
+              title="Buka Google Spreadsheet di Tab Baru"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              <span>Buka di Google Sheets</span>
+              <ExternalLink className="h-3 w-3" />
+            </a>
             <button
               type="button"
               onClick={handleExportPDF}

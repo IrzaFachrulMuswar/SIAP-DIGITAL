@@ -273,6 +273,19 @@ export interface PakSkpRecord {
 export type DokumenPAKSKP = PakSkpRecord;
 
 // KEUANGAN MODELS
+export interface LampiranDokumen {
+  id: string;
+  nama?: string;
+  kategori?: string;
+  jenis?: string;
+  namaFile?: string;
+  ukuran?: string | number;
+  tipe?: string;
+  uploadedAt: string;
+  dataUrl?: string;
+  url?: string;
+}
+
 export interface PerjalananDinasRecord {
   id: string;
   nomorSuratTugas: string;
@@ -306,13 +319,7 @@ export interface PerjalananDinasRecord {
     totalBiaya: number;
   };
   status: 'Draf' | 'Diajukan' | 'Diverifikasi PPK' | 'Disetujui KPA' | 'Disetujui PPK' | 'Lunas Dicairkan' | 'Lunas Dibayar Kas' | 'Selesai Dilaporkan' | 'Diusulkan';
-  dokumen?: {
-    id: string;
-    jenis: 'Surat Tugas' | 'Tiket / Boarding Pass' | 'Kwitansi Hotel' | 'Laporan Hasil Perjalanan' | 'Lainnya' | string;
-    namaFile: string;
-    ukuran?: string;
-    uploadedAt: string;
-  }[];
+  dokumen?: LampiranDokumen[];
   catatan?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -336,12 +343,7 @@ export interface LemburRecord {
   totalUangLembur: number;
   uraianPekerjaan: string;
   status: 'Diajukan' | 'Diverifikasi Kasubag' | 'Disetujui Atasan' | 'Disetujui PPK' | 'Dibayarkan' | 'Telah Dibayarkan';
-  dokumen?: {
-    id: string;
-    jenis: string;
-    namaFile: string;
-    uploadedAt: string;
-  }[];
+  dokumen?: LampiranDokumen[];
   catatan?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -384,13 +386,7 @@ export interface PerbendaharaanRecord {
   nomorSP2DRef?: string;
   
   status: StatusPerbendaharaan;
-  dokumenLampiran?: {
-    id: string;
-    nama: string;
-    namaFile: string;
-    ukuran?: string;
-    uploadedAt: string;
-  }[];
+  dokumenLampiran?: LampiranDokumen[];
   
   verifikator?: string;
   tanggalPencairan?: string;
@@ -398,6 +394,53 @@ export interface PerbendaharaanRecord {
   createdAt?: string;
   updatedAt?: string;
 }
+
+export type StatusUangMakan = 
+  | 'Diusulkan' 
+  | 'Diverifikasi Bendahara' 
+  | 'SPM Terbit' 
+  | 'SP2D Terbit / Cair'
+  | 'Ditolak / Perbaikan';
+
+export interface RekapBulananUangMakan {
+  id: string;
+  bulan: string; // e.g. "Agustus 2026", "September 2026"
+  tahun: number;
+  jumlahPegawai: number; // Jumlah ASN penerima
+  totalHariHadir: number; // Total hari kerja efektif hadir
+  totalBruto: number; // Total uang makan sebelum pajak
+  totalPph21: number; // Total potongan PPh 21
+  totalNetto: number; // Total uang makan bersih
+  bankPenyalur: string; // Bank penyalur/rekening pengeluaran
+  nomorRekeningPengeluaran?: string;
+  status: StatusUangMakan;
+  nomorSP2DRef?: string;
+  tanggalPencairan?: string;
+  nomorSPMRef?: string;
+  dokumenLampiran?: LampiranDokumen[];
+  catatan?: string;
+  createdAt?: string;
+  updatedAt?: string;
+
+  // Optional backward-compatibility fields
+  namaPegawai?: string;
+  pegawaiId?: string;
+  nip?: string;
+  golongan?: string;
+  jabatan?: string;
+  unitKerja?: string;
+  nomorRekening?: string;
+  bank?: string;
+  npwp?: string;
+  jumlahHariHadir?: number;
+  tarifPerHari?: number;
+  jumlahKotor?: number;
+  persenPph21?: number;
+  potonganPph21?: number;
+  jumlahBersih?: number;
+}
+
+export type UangMakanRecord = RekapBulananUangMakan;
 
 export interface NotificationItem {
   id: string;

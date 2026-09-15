@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Employee, CutiBKNRecord, PerbendaharaanRecord, PerjalananDinasRecord, LemburRecord, KGBRecord } from '../types';
+import { Employee, CutiBKNRecord, PerbendaharaanRecord, PerjalananDinasRecord, LemburRecord, KGBRecord, UangMakanRecord } from '../types';
 
 // Format Currency IDR
 export const formatRupiah = (value: number): string => {
@@ -799,6 +799,130 @@ export const exportSimpegMonthlyAttendancesPDF = (items: any[]) => {
 
   doc.save(`Rekap_Bulanan_Presensi_SIMPEG_${new Date().toISOString().slice(0, 10)}.pdf`);
 };
+
+// EXPORT REKAPITULASI PEMBAYARAN UANG MAKAN PER BULAN (PDF)
+export const exportUangMakanPDF = (items: UangMakanRecord[], judulTambahan = '') => {
+  const doc = new jsPDF('landscape');
+
+  // Kop Dinas Resmi
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('BADAN KARANTINA INDONESIA', 148, 14, { align: 'center' });
+  doc.setFontSize(11);
+  doc.text('BALAI KARANTINA HEWAN, IKAN, DAN TUMBUHAN PAPUA TENGAH', 148, 20, { align: 'center' });
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text('LAPORAN REKAPITULASI PEMBAYARAN UANG MAKAN PEGAWAI APARATUR SIPIL NEGARA (ASN) PER BULAN', 148, 25, { align: 'center' });
+
+  // Garis Pembatas Kop
+  doc.setLineWidth(0.8);
+  doc.line(14, 28, 282, 28);
+  doc.setLineWidth(0.2);
+  doc.line(14, 29.5, 282, 29.5);
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Rekapitulasi Realisasi Bulanan ${judulTambahan ? `(${judulTambahan})` : ''}`, 14, 36);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text(`Waktu Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} | Standar Biaya Masukan (SBM) PMK Kemenkeu RI`, 14, 41);
+
+  const totalPegawai = items.reduce((acc, curr) => acc + (curr.jumlahPegawai || 25), 0);
+  const totalHari = items.reduce((acc, curr) => acc + (curr.totalHariHadir || curr.jumlahHariHadir || 0), 0);
+  const totalBruto = items.reduce((acc, curr) => acc + (curr.totalBruto || curr.jumlahKotor || 0), 0);
+  const totalPph = items.reduce((acc, curr) => acc + (curr.totalPph21 || curr.potonganPph21 || 0), 0);
+  const totalNetto = items.reduce((acc, curr) => acc + (curr.totalNetto || curr.jumlahBersih || 0), 0);
+
+  const tableBody = items.map((item, idx) => [
+    String(idx + 1),
+    item.bulan,
+    `${item.jumlahPegawai || 25} Pegawai`,
+    `${item.totalHariHadir || item.jumlahHariHadir || 0} Hari`,
+    formatRupiah(item.totalBruto || item.jumlahKotor || 0),
+    formatRupiah(item.totalPph21 || item.potonganPph21 || 0),
+    formatRupiah(item.totalNetto || item.jumlahBersih || 0),
+    item.bankPenyalur || item.bank || 'Bank Mandiri',
+    item.status,
+    item.nomorSP2DRef || item.nomorSPMRef || '-'
+  ]);
+
+  // Baris Total Akumulatif
+  tableBody.push([
+    '',
+    'TOTAL REKAPITULASI',
+    `${totalPegawai} Pegawai`,
+    `${totalHari} Hari`,
+    formatRupiah(totalBruto),
+    formatRupiah(totalPph),
+    formatRupiah(totalNetto),
+    '',
+    '',
+    ''
+  ]);
+
+  autoTable(doc, {
+    startY: 44,
+    head: [
+      ['No', 'Periode Bulan', 'Jumlah Pegawai', 'Total Hari Hadir', 'Total Bruto', 'Potongan PPh 21', 'Jumlah Netto', 'Bank Penyalur', 'Status', 'Nomor SP2D / SPM']
+    ],
+    body: tableBody,
+    theme: 'grid',
+    styles: { fontSize: 7.5, cellPadding: 2 },
+    headStyles: { fillColor: [217, 119, 6], textColor: 255, fontStyle: 'bold', halign: 'center' },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 8 },
+      1: { cellWidth: 32, fontStyle: 'bold' },
+      2: { cellWidth: 26, halign: 'center' },
+      3: { halign: 'center', cellWidth: 24 },
+      4: { halign: 'right', cellWidth: 28, fontStyle: 'bold' },
+      5: { halign: 'right', cellWidth: 26, textColor: [220, 38, 38] },
+      6: { halign: 'right', cellWidth: 28, fontStyle: 'bold', textColor: [5, 150, 105] },
+      7: { cellWidth: 36 },
+      8: { halign: 'center', cellWidth: 28 },
+      9: { cellWidth: 32, halign: 'center', font: 'courier' }
+    },
+    didParseCell: function(data) {
+      if (data.row.index === tableBody.length - 1) {
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.fillColor = [254, 243, 199];
+      }
+    }
+  });
+
+  let finalY = (doc as any).lastAutoTable?.finalY || 160;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  if (finalY + 40 > pageHeight - 15) {
+    doc.addPage();
+    finalY = 25;
+  }
+
+  const signY = finalY + 8;
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Setuju Dibayar,', 30, signY);
+  doc.text('Pejabat Pembuat Komitmen (PPK)', 30, signY + 4);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Siti Nurhaliza, S.E., M.Ak.', 30, signY + 22);
+  doc.setFont('helvetica', 'normal');
+  doc.text('NIP. 19880512 201201 2 003', 30, signY + 26);
+
+  doc.text('Lunas Dibayar Kas,', 148, signY);
+  doc.text('Bendahara Pengeluaran', 148, signY + 4);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Mila Yasni Morintoh, S.P.', 148, signY + 22);
+  doc.setFont('helvetica', 'normal');
+  doc.text('NIP. 197501222006042023', 148, signY + 26);
+
+  doc.text('Mengetahui,', 220, signY);
+  doc.text('Kuasa Pengguna Anggaran (KPA)', 220, signY + 4);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Dr. Ir. Suprayitno, M.Si.', 220, signY + 22);
+  doc.setFont('helvetica', 'normal');
+  doc.text('NIP. 19710315 199803 1 002', 220, signY + 26);
+
+  doc.save(`Rekapitulasi_Bulanan_Uang_Makan_${new Date().toISOString().slice(0, 10)}.pdf`);
+};
+
 
 
 

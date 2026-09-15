@@ -16,10 +16,23 @@ import {
   Building2, 
   Send,
   AlertTriangle,
-  ShieldCheck
+  ShieldCheck,
+  ExternalLink,
+  Copy,
+  Check,
+  Eye,
+  Paperclip
 } from 'lucide-react';
-import { PerbendaharaanRecord, JenisPerbendaharaan, TipePembayaran, StatusPerbendaharaan } from '../types';
+import { PerbendaharaanRecord, JenisPerbendaharaan, TipePembayaran, StatusPerbendaharaan, LampiranDokumen } from '../types';
 import { formatRupiah, exportPerbendaharaanPDF, exportToExcel } from '../utils/exportUtils';
+import { FileUploadZone } from '../components/FileUploadZone';
+import { DocumentViewerModal } from '../components/DocumentViewerModal';
+
+// Google Spreadsheet Rekapitulasi SPP, SPM, dan SP2D ID: 1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M (gid: 434072222)
+export const PERBENDAHARAAN_SPREADSHEET_ID = '1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M';
+export const PERBENDAHARAAN_SPREADSHEET_GID = '434072222';
+export const PERBENDAHARAAN_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${PERBENDAHARAAN_SPREADSHEET_ID}/edit?gid=${PERBENDAHARAAN_SPREADSHEET_GID}#gid=${PERBENDAHARAAN_SPREADSHEET_GID}`;
+export const PERBENDAHARAAN_SPREADSHEET_EMBED_URL = `https://docs.google.com/spreadsheets/d/${PERBENDAHARAAN_SPREADSHEET_ID}/htmlembed?gid=${PERBENDAHARAAN_SPREADSHEET_GID}&widget=true&headers=false`;
 
 interface PerbendaharaanViewProps {
   records: PerbendaharaanRecord[];
@@ -39,6 +52,14 @@ export const PerbendaharaanView: React.FC<PerbendaharaanViewProps> = ({
   const [search, setSearch] = useState('');
   const [filterJenis, setFilterJenis] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [copiedSpreadsheet, setCopiedSpreadsheet] = useState(false);
+  const [showSheetPreview, setShowSheetPreview] = useState(false);
+
+  const handleCopySpreadsheet = () => {
+    navigator.clipboard.writeText(PERBENDAHARAAN_SPREADSHEET_URL);
+    setCopiedSpreadsheet(true);
+    setTimeout(() => setCopiedSpreadsheet(false), 2500);
+  };
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -58,6 +79,20 @@ export const PerbendaharaanView: React.FC<PerbendaharaanViewProps> = ({
     pejabatPenandatangan: 'Drs. H. Mulyadi, M.Si. (PPK)',
     nomorSP2DRef: 'SP2D-260123984',
     status: 'Diterbitkan SPM',
+    dokumenLampiran: [],
+  });
+
+  // Document Viewer Modal State
+  const [viewingDocs, setViewingDocs] = useState<{
+    isOpen: boolean;
+    title: string;
+    subtitle?: string;
+    documents: LampiranDokumen[];
+  }>({
+    isOpen: false,
+    title: '',
+    subtitle: '',
+    documents: [],
   });
 
   const filteredRecords = records.filter((r) => {
@@ -97,13 +132,14 @@ export const PerbendaharaanView: React.FC<PerbendaharaanViewProps> = ({
       pejabatPenandatangan: 'Drs. H. Mulyadi, M.Si. (PPK)',
       nomorSP2DRef: '',
       status: 'Draf SPP',
+      dokumenLampiran: [],
     });
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (rec: PerbendaharaanRecord) => {
     setIsEditing(true);
-    setFormData({ ...rec });
+    setFormData({ ...rec, dokumenLampiran: rec.dokumenLampiran || [] });
     setIsModalOpen(true);
   };
 
@@ -171,7 +207,20 @@ export const PerbendaharaanView: React.FC<PerbendaharaanViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <a
+            id="btn-google-sheets-perbendaharaan-top"
+            href={PERBENDAHARAAN_SPREADSHEET_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/90 hover:bg-emerald-100 px-3.5 py-2 text-xs font-bold text-emerald-700 transition-colors shadow-xs cursor-pointer"
+            title="Buka Google Spreadsheet Rekapitulasi SPP, SPM, dan SP2D"
+          >
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+            <span>Spreadsheet SPP/SPM/SP2D</span>
+            <ExternalLink className="h-3 w-3 text-emerald-500" />
+          </a>
+
           <button
             type="button"
             onClick={() => exportPerbendaharaanPDF(records)}
@@ -198,6 +247,115 @@ export const PerbendaharaanView: React.FC<PerbendaharaanViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Card Google Spreadsheet Rekapitulasi SPP, SPM, dan SP2D */}
+      <div className="rounded-2xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/95 via-teal-50/60 to-cyan-50/40 p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <div className="p-2.5 bg-emerald-600 text-white rounded-xl shadow-xs shrink-0 mt-0.5">
+            <FileSpreadsheet className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900">
+                Google Spreadsheet Rekapitulasi SPP, SPM, dan SP2D
+              </h3>
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Spreadsheet Terhubung (Tab GID: {PERBENDAHARAAN_SPREADSHEET_GID})
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+              Monitoring real-time nomor dokumen SPP, penerbitan SPM, nomor SP2D KPPN, akun anggaran (MAK), nilai rupiah belanja negara, serta verifikasi rekening penerima.
+            </p>
+            <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-emerald-700 bg-white/90 border border-emerald-200/80 rounded-lg px-2.5 py-1 w-fit max-w-full overflow-hidden text-ellipsis">
+              <span className="text-slate-400">Spreadsheet ID:</span>
+              <span className="truncate font-bold">{PERBENDAHARAAN_SPREADSHEET_ID} (gid: {PERBENDAHARAAN_SPREADSHEET_GID})</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+          <button
+            type="button"
+            id="btn-toggle-preview-perbendaharaan-sheet"
+            onClick={() => setShowSheetPreview(!showSheetPreview)}
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors shadow-2xs cursor-pointer ${
+              showSheetPreview
+                ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
+                : 'bg-white border-emerald-200 text-slate-700 hover:bg-emerald-50'
+            }`}
+            title="Tampilkan / Sembunyikan Pratinjau Google Sheets SPP/SPM/SP2D"
+          >
+            <Eye className="h-3.5 w-3.5 text-emerald-600" />
+            <span>{showSheetPreview ? 'Tutup Pratinjau' : 'Pratinjau Sheets'}</span>
+          </button>
+          <button
+            type="button"
+            id="btn-copy-perbendaharaan-spreadsheet"
+            onClick={handleCopySpreadsheet}
+            className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 transition-colors shadow-2xs cursor-pointer"
+            title="Salin Link Google Spreadsheet"
+          >
+            {copiedSpreadsheet ? (
+              <>
+                <Check className="h-3.5 w-3.5 text-emerald-600" />
+                <span className="text-emerald-700 font-bold">Tersalin!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="h-3.5 w-3.5 text-slate-500" />
+                <span>Salin Link</span>
+              </>
+            )}
+          </button>
+          <a
+            id="btn-open-perbendaharaan-spreadsheet-banner"
+            href={PERBENDAHARAAN_SPREADSHEET_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            <span>Buka di Google Sheets</span>
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        </div>
+      </div>
+
+      {/* Pratinjau Inline Google Sheets SPP SPM SP2D jika dibuka */}
+      {showSheetPreview && (
+        <div className="rounded-2xl border border-emerald-200 bg-white shadow-sm overflow-hidden animate-in fade-in duration-200">
+          <div className="bg-emerald-50/80 px-4 py-2.5 border-b border-emerald-200 text-xs text-slate-700 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+              <span className="font-semibold text-slate-800">Pratinjau Langsung: Google Spreadsheet SPP, SPM, dan SP2D (gid: {PERBENDAHARAAN_SPREADSHEET_GID})</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <a
+                href={PERBENDAHARAAN_SPREADSHEET_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-emerald-700 font-bold hover:underline flex items-center gap-1"
+              >
+                Buka Tab Baru <ExternalLink className="h-3 w-3" />
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowSheetPreview(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-white cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          <iframe
+            src={PERBENDAHARAAN_SPREADSHEET_EMBED_URL}
+            className="w-full h-[520px] border-0 bg-white"
+            title="Google Spreadsheet SPP, SPM, dan SP2D"
+            loading="lazy"
+          />
+        </div>
+      )}
 
       {/* Overview Metric Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -315,6 +473,27 @@ export const PerbendaharaanView: React.FC<PerbendaharaanViewProps> = ({
                       </span>
                       <p className="font-mono font-bold text-slate-900 mt-1">{item.nomorDokumen}</p>
                       <p className="text-[10px] text-slate-400">Tgl: {item.tanggalDokumen}</p>
+                      {item.dokumenLampiran && item.dokumenLampiran.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setViewingDocs({
+                            isOpen: true,
+                            title: `Berkas Lampiran: ${item.nomorDokumen}`,
+                            subtitle: `${item.jenis} (${item.tipePembayaran}) - Nilai: ${formatRupiah(item.nilaiRupiah)}`,
+                            documents: item.dokumenLampiran || [],
+                          })}
+                          className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[10px] border border-emerald-200 transition-colors cursor-pointer"
+                          title="Lihat berkas lampiran yang diupload"
+                        >
+                          <Paperclip className="h-3 w-3 text-emerald-600" />
+                          <span>{item.dokumenLampiran.length} File Lampiran</span>
+                        </button>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 mt-1 text-[10px] text-slate-400">
+                          <Paperclip className="h-3 w-3 text-slate-300" />
+                          <span>0 Lampiran</span>
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="py-3 px-3 max-w-[220px]">
@@ -353,6 +532,16 @@ export const PerbendaharaanView: React.FC<PerbendaharaanViewProps> = ({
                   </td>
                   <td className="py-3 px-4 text-center">
                     <div className="flex items-center justify-center gap-1">
+                      <a
+                        href={PERBENDAHARAAN_SPREADSHEET_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 p-1.5 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                        title="Buka Data di Google Spreadsheet SPP/SPM/SP2D"
+                      >
+                        <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>Sheet</span>
+                      </a>
                       <button
                         type="button"
                         onClick={() => handleOpenEdit(item)}
@@ -540,6 +729,45 @@ export const PerbendaharaanView: React.FC<PerbendaharaanViewProps> = ({
                 </select>
               </div>
 
+              {/* Form Input Upload Berkas Lampiran SPP / SPM / SP2D */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5">
+                <FileUploadZone
+                  label="Form Input Upload Berkas Lampiran SPP / SPM / SP2D"
+                  sublabel="Berkas SPP, Lembar SPM Resmi (SAKTI Kemenkeu), Salinan SP2D KPPN, Kuitansi & Faktur Pajak, BAST / SPTJB"
+                  categoryOptions={[
+                    'Berkas SPP',
+                    'Lembar SPM Resmi (SAKTI)',
+                    'Salinan SP2D KPPN',
+                    'Kuitansi & Faktur Pajak',
+                    'BAST / SPTJB',
+                    'Lainnya',
+                  ]}
+                  defaultCategory="Berkas SPP"
+                  documents={formData.dokumenLampiran || []}
+                  onChange={(newDocs) => setFormData({ ...formData, dokumenLampiran: newDocs })}
+                />
+              </div>
+
+              {/* Tautan Google Spreadsheet Rekap SPP, SPM & SP2D */}
+              <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/70 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs text-slate-700 font-medium">
+                    Google Spreadsheet Rekap SPP, SPM & SP2D (gid: {PERBENDAHARAAN_SPREADSHEET_GID}):
+                  </span>
+                </div>
+                <a
+                  href={PERBENDAHARAAN_SPREADSHEET_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-white border border-emerald-200 rounded-lg px-2.5 py-1.5 shrink-0 shadow-2xs w-fit cursor-pointer"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  <span>Buka Spreadsheet</span>
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -559,6 +787,15 @@ export const PerbendaharaanView: React.FC<PerbendaharaanViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Document Viewer Modal */}
+      <DocumentViewerModal
+        isOpen={viewingDocs.isOpen}
+        onClose={() => setViewingDocs({ ...viewingDocs, isOpen: false })}
+        title={viewingDocs.title}
+        subtitle={viewingDocs.subtitle}
+        documents={viewingDocs.documents}
+      />
     </div>
   );
 };

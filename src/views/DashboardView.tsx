@@ -14,7 +14,9 @@ import {
   Database,
   Building,
   Award,
-  AlertCircle
+  AlertCircle,
+  ExternalLink,
+  FolderOpen
 } from 'lucide-react';
 import { 
   Employee, 
@@ -25,6 +27,9 @@ import {
   PerjalananDinasRecord 
 } from '../types';
 import { formatRupiah, exportToExcel, exportEmployeeListPDF, exportPerbendaharaanPDF } from '../utils/exportUtils';
+import { SPPD_GOOGLE_DRIVE_URL, SPPD_SPREADSHEET_URL, LEMBUR_SPREADSHEET_URL } from './KeuanganSppdView';
+import { PERBENDAHARAAN_SPREADSHEET_URL } from './PerbendaharaanView';
+import { UANG_MAKAN_SPREADSHEET_URL } from './UangMakanView';
 
 interface DashboardViewProps {
   employees: Employee[];
@@ -427,13 +432,50 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <span className="text-slate-600 flex items-center gap-1.5">
                     <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" /> Perjalanan Dinas (SPD)
                   </span>
-                  <span className="font-bold text-slate-800">{formatRupiah(totalSPPD)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800">{formatRupiah(totalSPPD)}</span>
+                    <a
+                      href={SPPD_SPREADSHEET_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50/90 hover:bg-emerald-100 border border-emerald-200/80 px-2 py-0.5 rounded-md transition-colors"
+                      title="Buka Google Spreadsheet Laporan Perjalanan Dinas (SPD)"
+                    >
+                      <FileSpreadsheet className="h-3 w-3 text-emerald-600" />
+                      <span>Sheet</span>
+                      <ExternalLink className="h-2.5 w-2.5 text-emerald-500" />
+                    </a>
+                    <a
+                      href={SPPD_GOOGLE_DRIVE_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50/90 hover:bg-blue-100 border border-blue-200/80 px-2 py-0.5 rounded-md transition-colors"
+                      title="Buka Folder Google Drive Laporan Perjalanan Dinas"
+                    >
+                      <FolderOpen className="h-3 w-3 text-blue-600" />
+                      <span>Drive</span>
+                      <ExternalLink className="h-2.5 w-2.5 text-blue-500" />
+                    </a>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600 flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-slate-600" /> Pengajuan Lembur
+                    <Clock className="h-3.5 w-3.5 text-violet-600" /> Pengajuan Lembur
                   </span>
-                  <span className="font-bold text-slate-800">{formatRupiah(285500)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800">{formatRupiah(285500)}</span>
+                    <a
+                      href={LEMBUR_SPREADSHEET_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50/90 hover:bg-emerald-100 border border-emerald-200/80 px-2 py-0.5 rounded-md transition-colors"
+                      title="Buka Google Spreadsheet Rekap Absen & Lembur"
+                    >
+                      <FileSpreadsheet className="h-3 w-3 text-emerald-600" />
+                      <span>Sheet</span>
+                      <ExternalLink className="h-2.5 w-2.5 text-emerald-500" />
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
@@ -459,6 +501,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               >
                 <Download className="h-3.5 w-3.5" /> PDF SP2D
               </button>
+              <a
+                href={PERBENDAHARAAN_SPREADSHEET_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 p-2 rounded-md border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-xs font-bold text-emerald-800 transition-colors shadow-2xs"
+                title="Buka Google Spreadsheet SPP, SPM, dan SP2D"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" /> Sheet SP2D
+              </a>
+              <a
+                href={UANG_MAKAN_SPREADSHEET_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 p-2 rounded-md border border-amber-200 bg-amber-50 hover:bg-amber-100 text-xs font-bold text-amber-900 transition-colors shadow-2xs"
+                title="Buka Google Spreadsheet Rekapitulasi Uang Makan"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 text-amber-600" /> Sheet Uang Makan
+              </a>
             </div>
           </div>
         </div>

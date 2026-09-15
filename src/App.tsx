@@ -9,6 +9,7 @@ import {
   PerjalananDinasRecord, 
   LemburRecord, 
   PerbendaharaanRecord, 
+  UangMakanRecord,
   NotificationItem, 
   SyncLog, 
   UserSession 
@@ -23,6 +24,7 @@ import {
   initialSPPD, 
   initialLembur, 
   initialPerbendaharaan, 
+  initialUangMakan,
   initialNotifications, 
   initialSyncLogs, 
   initialUserSession 
@@ -48,6 +50,7 @@ import { KgbView } from './views/KgbView';
 import { CutiView } from './views/CutiView';
 import { KeuanganSppdView } from './views/KeuanganSppdView';
 import { PerbendaharaanView } from './views/PerbendaharaanView';
+import { UangMakanView } from './views/UangMakanView';
 import { GoogleSheetsView } from './views/GoogleSheetsView';
 import { exportEmployeeListPDF, exportToExcel } from './utils/exportUtils';
 
@@ -99,6 +102,7 @@ export default function App() {
   const [sppdList, setSppdList] = useState<PerjalananDinasRecord[]>(initialSPPD);
   const [lemburList, setLemburList] = useState<LemburRecord[]>(initialLembur);
   const [perbendaharaanList, setPerbendaharaanList] = useState<PerbendaharaanRecord[]>(initialPerbendaharaan);
+  const [uangMakanList, setUangMakanList] = useState<UangMakanRecord[]>(initialUangMakan);
 
   // System & Security State
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
@@ -443,6 +447,33 @@ export default function App() {
     setPerbendaharaanList((prev) => prev.filter((p) => p.id !== id));
   };
 
+  // --- CRUD Handlers: Uang Makan Pegawai ASN (Rekapan Per Bulan) ---
+  const handleAddUangMakan = (record: UangMakanRecord) => {
+    setUangMakanList((prev) => [record, ...prev]);
+    triggerNotification(
+      'Rekapitulasi Uang Makan',
+      `Rekapan uang makan periode ${record.bulan} berhasil ditambahkan ke sistem.`,
+      'KEUANGAN',
+      'success',
+      'uang_makan'
+    );
+  };
+
+  const handleUpdateUangMakan = (record: UangMakanRecord) => {
+    setUangMakanList((prev) => prev.map((u) => (u.id === record.id ? record : u)));
+    triggerNotification(
+      'Pembaruan Uang Makan',
+      `Rekapan uang makan periode ${record.bulan} diperbarui (Status: ${record.status}).`,
+      'KEUANGAN',
+      'info',
+      'uang_makan'
+    );
+  };
+
+  const handleDeleteUangMakan = (id: string) => {
+    setUangMakanList((prev) => prev.filter((u) => u.id !== id));
+  };
+
   // Notification badge counts
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
   const pendingCutiCount = cutiList.filter((c) => c.statusFinal.includes('Menunggu')).length;
@@ -562,6 +593,7 @@ export default function App() {
 
             {(currentTab === 'sppd' || currentTab === 'lembur') && (
               <KeuanganSppdView
+                initialTab={currentTab === 'lembur' ? 'lembur' : 'sppd'}
                 sppdList={sppdList}
                 lemburList={lemburList}
                 employees={employees}
@@ -581,6 +613,17 @@ export default function App() {
                 onAddRecord={handleAddPerbendaharaan}
                 onUpdateRecord={handleUpdatePerbendaharaan}
                 onDeleteRecord={handleDeletePerbendaharaan}
+                onRequest2FA={handleRequest2FA}
+              />
+            )}
+
+            {currentTab === 'uang_makan' && (
+              <UangMakanView
+                records={uangMakanList}
+                employees={employees}
+                onAddRecord={handleAddUangMakan}
+                onUpdateRecord={handleUpdateUangMakan}
+                onDeleteRecord={handleDeleteUangMakan}
                 onRequest2FA={handleRequest2FA}
               />
             )}
