@@ -99,7 +99,20 @@ export default function App() {
   const [kpList, setKpList] = useState<KenaikanPangkatRecord[]>(initialKP);
   const [cutiList, setCutiList] = useState<CutiBKNRecord[]>(initialCutiBKN);
   const [pakSkpList, setPakSkpList] = useState<PakSkpRecord[]>(initialPakSkp as any);
-  const [sppdList, setSppdList] = useState<PerjalananDinasRecord[]>(initialSPPD);
+  const [sppdList, setSppdList] = useState<PerjalananDinasRecord[]>(() => {
+    try {
+      const cached = localStorage.getItem('sppd_spreadsheet_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading sppd cache', e);
+    }
+    return initialSPPD;
+  });
   const [lemburList, setLemburList] = useState<LemburRecord[]>(initialLembur);
   const [perbendaharaanList, setPerbendaharaanList] = useState<PerbendaharaanRecord[]>(initialPerbendaharaan);
   const [uangMakanList, setUangMakanList] = useState<UangMakanRecord[]>(initialUangMakan);
@@ -400,6 +413,18 @@ export default function App() {
     setSppdList((prev) => prev.filter((s) => s.id !== id));
   };
 
+  const handleBatchSyncSPPD = (records: PerjalananDinasRecord[]) => {
+    setSppdList(records);
+    localStorage.setItem('sppd_spreadsheet_cache', JSON.stringify(records));
+    triggerNotification(
+      'Sinkronisasi Google Spreadsheet',
+      `${records.length} data SPD berhasil disinkronkan dengan Google Spreadsheet (ID: 1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M, gid: 271751341).`,
+      'KEUANGAN',
+      'success',
+      'sppd'
+    );
+  };
+
   // --- CRUD Handlers: Lembur ---
   const handleAddLembur = (record: LemburRecord) => {
     setLemburList((prev) => [record, ...prev]);
@@ -600,6 +625,7 @@ export default function App() {
                 onAddSPPD={handleAddSPPD}
                 onUpdateSPPD={handleUpdateSPPD}
                 onDeleteSPPD={handleDeleteSPPD}
+                onBatchSyncSPPD={handleBatchSyncSPPD}
                 onAddLembur={handleAddLembur}
                 onUpdateLembur={handleUpdateLembur}
                 onDeleteLembur={handleDeleteLembur}

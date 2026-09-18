@@ -20,20 +20,53 @@ import {
   Copy,
   Check,
   Eye,
-  Paperclip
+  Paperclip,
+  RefreshCw,
+  UploadCloud,
+  DownloadCloud,
+  ArrowRightLeft,
+  Settings2,
+  AlertCircle,
+  Link2,
+  Code2,
+  Sparkles,
+  History,
+  ShieldCheck,
+  Table,
+  Zap,
+  Info
 } from 'lucide-react';
 import { PerjalananDinasRecord, LemburRecord, Employee, LampiranDokumen } from '../types';
 import { formatRupiah, exportSPPDPDF, exportToExcel } from '../utils/exportUtils';
 import { FileUploadZone } from '../components/FileUploadZone';
 import { DocumentViewerModal } from '../components/DocumentViewerModal';
+import { SppdSpreadsheetBridgeModal, SyncAuditLogItem } from '../components/SppdSpreadsheetBridgeModal';
+import {
+  SPPD_SPREADSHEET_ID,
+  SPPD_SPREADSHEET_GID,
+  SPPD_SPREADSHEET_URL,
+  SPPD_SPREADSHEET_EMBED_URL,
+  SPPD_SPREADSHEET_GVIZ_URL,
+  SPPD_SPREADSHEET_CSV_URL,
+  SPPD_SHEET_HEADERS,
+  fetchLiveSPPDSpreadsheet,
+  formatSPPDListForSheet,
+  generateCopyableSheetText,
+  getAppsScriptBridgeCodeSnippet,
+} from '../data/sppdSpreadsheetData';
 
-export const SPPD_GOOGLE_DRIVE_URL = 'https://drive.google.com/drive/folders/1cjqUhafgThFWGnM3QbWllh1TQmozJwLr';
+export const SPPD_GOOGLE_DRIVE_URL = 'https://drive.google.com/drive/folders/1spWg8Lwd-H3WXy_s6M6ip7SzKAZjYrrv?usp=sharing';
 
-// Google Spreadsheet Laporan Perjalanan Dinas (SPD) ID: 1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M (gid: 271751341)
-export const SPPD_SPREADSHEET_ID = '1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M';
-export const SPPD_SPREADSHEET_GID = '271751341';
-export const SPPD_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${SPPD_SPREADSHEET_ID}/edit?gid=${SPPD_SPREADSHEET_GID}#gid=${SPPD_SPREADSHEET_GID}`;
-export const SPPD_SPREADSHEET_EMBED_URL = `https://docs.google.com/spreadsheets/d/${SPPD_SPREADSHEET_ID}/htmlembed?gid=${SPPD_SPREADSHEET_GID}&widget=true&headers=false`;
+// Re-export Google Spreadsheet Laporan Perjalanan Dinas (SPD) constants
+export {
+  SPPD_SPREADSHEET_ID,
+  SPPD_SPREADSHEET_GID,
+  SPPD_SPREADSHEET_URL,
+  SPPD_SPREADSHEET_EMBED_URL,
+  SPPD_SPREADSHEET_GVIZ_URL,
+  SPPD_SPREADSHEET_CSV_URL,
+  SPPD_SHEET_HEADERS,
+};
 
 // Google Spreadsheet Rekap Absen & Laporan Lembur ID: 1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M
 export const LEMBUR_SPREADSHEET_ID = '1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M';
@@ -48,6 +81,7 @@ interface KeuanganSppdViewProps {
   onAddSPPD: (record: PerjalananDinasRecord) => void;
   onUpdateSPPD: (record: PerjalananDinasRecord) => void;
   onDeleteSPPD: (id: string) => void;
+  onBatchSyncSPPD?: (records: PerjalananDinasRecord[]) => void;
   onAddLembur: (record: LemburRecord) => void;
   onUpdateLembur: (record: LemburRecord) => void;
   onDeleteLembur: (id: string) => void;
@@ -62,6 +96,7 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
   onAddSPPD,
   onUpdateSPPD,
   onDeleteSPPD,
+  onBatchSyncSPPD,
   onAddLembur,
   onUpdateLembur,
   onDeleteLembur,
@@ -74,6 +109,164 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
   const [showSppdSheetPreview, setShowSppdSheetPreview] = useState(false);
   const [copiedLemburSpreadsheet, setCopiedLemburSpreadsheet] = useState(false);
   const [showLemburSheetPreview, setShowLemburSheetPreview] = useState(false);
+
+  // Google Spreadsheet Sync Bridge State
+  const [isSyncingBridge, setIsSyncingBridge] = useState(false);
+  const [isBridgeModalOpen, setIsBridgeModalOpen] = useState(false);
+  const [lastSyncBridgeTime, setLastSyncBridgeTime] = useState<string>(() => {
+    return localStorage.getItem('sppd_last_sync_time') || 'Belum pernah disinkronkan';
+  });
+  const [syncedRowCount, setSyncedRowCount] = useState<number>(() => {
+    return parseInt(localStorage.getItem('sppd_synced_row_count') || '0', 10);
+  });
+  const [syncToast, setSyncToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [webhookUrl, setWebhookUrl] = useState<string>(() => {
+    return localStorage.getItem('sppd_bridge_webhook_url') || '';
+  });
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('sppd_auto_sync_enabled') === 'true';
+  });
+  const [syncAuditLogs, setSyncAuditLogs] = useState<SyncAuditLogItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('sppd_sync_audit_logs');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [
+      {
+        id: 'LOG-INIT',
+        timestamp: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIT',
+        action: 'Inisialisasi Jembatan',
+        count: sppdList.length,
+        status: 'INFO',
+        detail: `Jembatan Google Spreadsheet ID ${SPPD_SPREADSHEET_ID} (gid: ${SPPD_SPREADSHEET_GID}) aktif terhubung.`,
+      }
+    ];
+  });
+
+  const addAuditLog = (action: string, count: number, status: 'SUCCESS' | 'ERROR' | 'INFO', detail: string) => {
+    const newEntry: SyncAuditLogItem = {
+      id: `LOG-${Date.now()}`,
+      timestamp: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIT',
+      action,
+      count,
+      status,
+      detail
+    };
+    setSyncAuditLogs(prev => {
+      const updated = [newEntry, ...prev.slice(0, 24)];
+      localStorage.setItem('sppd_sync_audit_logs', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // 1. Tarik Data Live dari Google Spreadsheet
+  const handlePullFromSpreadsheet = async (isSilent = false) => {
+    setIsSyncingBridge(true);
+    try {
+      const result = await fetchLiveSPPDSpreadsheet(SPPD_SPREADSHEET_ID, SPPD_SPREADSHEET_GID);
+      const nowStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIT';
+      setLastSyncBridgeTime(nowStr);
+      localStorage.setItem('sppd_last_sync_time', nowStr);
+      setSyncedRowCount(result.records.length);
+      localStorage.setItem('sppd_synced_row_count', String(result.records.length));
+
+      if (result.records.length > 0) {
+        if (onBatchSyncSPPD) {
+          onBatchSyncSPPD(result.records);
+        }
+        addAuditLog('Tarik Data (Inbound)', result.records.length, 'SUCCESS', `Berhasil menarik ${result.records.length} data SPD dari sheet gid: ${SPPD_SPREADSHEET_GID}`);
+        if (!isSilent) {
+          setSyncToast({
+            type: 'success',
+            message: `Berhasil menarik & menyinkronkan ${result.records.length} data SPD dari Google Spreadsheet!`
+          });
+          setTimeout(() => setSyncToast(null), 4000);
+        }
+      } else {
+        addAuditLog('Pengecekan Sheet', 0, 'INFO', `Sheet terhubung (${result.headers.length} kolom terdeteksi). Belum ada baris data tambahan di sheet.`);
+        if (!isSilent) {
+          setSyncToast({
+            type: 'info',
+            message: `Jembatan terhubung aktif ke Google Spreadsheet (gid: ${SPPD_SPREADSHEET_GID}). Siap disinkronkan!`
+          });
+          setTimeout(() => setSyncToast(null), 4500);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error in handlePullFromSpreadsheet:', err);
+      addAuditLog('Tarik Data Gagal', 0, 'ERROR', err?.message || 'Gagal menghubungi Google Spreadsheet');
+      if (!isSilent) {
+        setSyncToast({
+          type: 'error',
+          message: `Gagal menarik data dari Google Spreadsheet: ${err?.message || 'Koneksi terputus'}`
+        });
+        setTimeout(() => setSyncToast(null), 5000);
+      }
+    } finally {
+      setIsSyncingBridge(false);
+    }
+  };
+
+  // 2. Auto-sync on mount jika autoSyncEnabled
+  useEffect(() => {
+    if (autoSyncEnabled) {
+      handlePullFromSpreadsheet(true);
+    }
+  }, []);
+
+  // 3. Kirim / Salin Data ke Google Spreadsheet
+  const handlePushToSpreadsheet = async () => {
+    if (webhookUrl && webhookUrl.startsWith('http')) {
+      try {
+        const rows = formatSPPDListForSheet(sppdList);
+        const res = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'sync_all', rows })
+        });
+        const json = await res.json();
+        addAuditLog('Kirim ke Webhook', sppdList.length, 'SUCCESS', `Tersinkron ke Apps Script Webhook: ${json.message || 'OK'}`);
+        setSyncToast({
+          type: 'success',
+          message: `Sukses mengirim ${sppdList.length} data SPD langsung ke Google Spreadsheet via Webhook!`
+        });
+      } catch (e: any) {
+        addAuditLog('Kirim ke Webhook Gagal', 0, 'ERROR', e.message);
+        setSyncToast({
+          type: 'error',
+          message: `Gagal mengirim ke Webhook: ${e.message}. Menggunakan metode salin format.`
+        });
+      } finally {
+        setTimeout(() => setSyncToast(null), 4000);
+      }
+    } else {
+      const text = generateCopyableSheetText(sppdList);
+      navigator.clipboard.writeText(text);
+      addAuditLog('Salin Format Baris', sppdList.length, 'SUCCESS', `Menyalin ${sppdList.length} baris format TSV ke clipboard untuk ditempel di sel A2 sheet gid ${SPPD_SPREADSHEET_GID}`);
+      setSyncToast({
+        type: 'success',
+        message: `${sppdList.length} baris data SPD telah disalin ke clipboard! Tempel (Ctrl+V) langsung di sel A2 Google Spreadsheet.`
+      });
+      setTimeout(() => setSyncToast(null), 5000);
+    }
+  };
+
+  const handleSaveWebhookUrl = (url: string) => {
+    setWebhookUrl(url);
+    localStorage.setItem('sppd_bridge_webhook_url', url);
+    addAuditLog('Konfigurasi Webhook', 0, 'INFO', url ? `Webhook URL diperbarui: ${url.slice(0, 45)}...` : 'Webhook URL dihapus.');
+  };
+
+  const handleToggleAutoSync = (val: boolean) => {
+    setAutoSyncEnabled(val);
+    localStorage.setItem('sppd_auto_sync_enabled', val ? 'true' : 'false');
+    addAuditLog('Auto-Sync Berubah', 0, 'INFO', val ? 'Sinkronisasi otomatis diaktifkan.' : 'Sinkronisasi otomatis dinonaktifkan.');
+  };
+
+  const handleClearLogs = () => {
+    setSyncAuditLogs([]);
+    localStorage.removeItem('sppd_sync_audit_logs');
+  };
 
   useEffect(() => {
     if (initialTab) {
@@ -323,12 +516,35 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
 
           {activeTab === 'sppd' ? (
             <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                id="btn-sync-live-sppd-top"
+                onClick={() => handlePullFromSpreadsheet(false)}
+                disabled={isSyncingBridge}
+                className="flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                title="Tarik data terkini dari Google Spreadsheet (gid: 271751341)"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isSyncingBridge ? 'animate-spin' : ''}`} />
+                <span>{isSyncingBridge ? 'Menyinkronkan...' : 'Sinkronkan Live'}</span>
+              </button>
+
+              <button
+                type="button"
+                id="btn-manage-bridge-top"
+                onClick={() => setIsBridgeModalOpen(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3.5 py-2 text-xs font-bold text-emerald-800 transition-colors shadow-2xs cursor-pointer"
+                title="Buka Pengaturan Jembatan Integrasi Google Spreadsheet"
+              >
+                <ArrowRightLeft className="h-3.5 w-3.5 text-emerald-600" />
+                <span>Jembatan Sinkronisasi</span>
+              </button>
+
               <a
                 id="btn-google-sheets-sppd-top"
                 href={SPPD_SPREADSHEET_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/90 hover:bg-emerald-100 px-3.5 py-2 text-xs font-bold text-emerald-700 transition-colors shadow-xs"
+                className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white hover:bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-700 transition-colors shadow-2xs"
                 title="Buka Google Spreadsheet Laporan Perjalanan Dinas (SPD)"
               >
                 <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
@@ -437,77 +653,157 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
 
       {/* Card Google Spreadsheet Laporan Perjalanan Dinas (SPD) */}
       {activeTab === 'sppd' && (
-        <div className="rounded-2xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/95 via-teal-50/60 to-cyan-50/40 p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className="p-2.5 bg-emerald-600 text-white rounded-xl shadow-xs shrink-0 mt-0.5">
-              <FileSpreadsheet className="h-5 w-5" />
+        <div className="rounded-2xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/95 via-teal-50/60 to-cyan-50/40 p-4 shadow-xs flex flex-col justify-between gap-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="p-2.5 bg-emerald-600 text-white rounded-xl shadow-xs shrink-0 mt-0.5">
+                <FileSpreadsheet className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Jembatan Google Spreadsheet Laporan Perjalanan Dinas (SPD)
+                  </h3>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Jembatan Terhubung (Tab GID: {SPPD_SPREADSHEET_GID})
+                  </span>
+                  {autoSyncEnabled && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold text-cyan-800 border border-cyan-200">
+                      <Zap className="h-3 w-3" /> Auto-Sync Aktif
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                  Tersinkronisasi dua arah untuk data Surat Tugas, pelaksana SPD, kota tujuan, rincian biaya riil, dan status SP2D.
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-mono text-emerald-700">
+                  <div className="bg-white/90 border border-emerald-200/80 rounded-lg px-2.5 py-1">
+                    <span className="text-slate-400">ID: </span>
+                    <span className="font-bold">{SPPD_SPREADSHEET_ID}</span>
+                    <span className="text-slate-400 ml-1.5">gid: </span>
+                    <span className="font-bold">{SPPD_SPREADSHEET_GID}</span>
+                  </div>
+                  <div className="bg-emerald-100/70 border border-emerald-200 text-emerald-800 rounded-lg px-2 py-1 text-[11px] font-sans font-medium">
+                    Terakhir Sinkron: <span className="font-bold">{lastSyncBridgeTime}</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-900">
-                  Google Spreadsheet Laporan Perjalanan Dinas (SPD)
-                </h3>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Spreadsheet Terhubung (Tab GID: {SPPD_SPREADSHEET_GID})
-                </span>
-              </div>
-              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                Pencatatan data Surat Tugas, pelaksana SPD, kota tujuan, rincian biaya tiket, penginapan & uang harian riil, serta rekapitulasi SP2D BKHIT.
-              </p>
-              <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-emerald-700 bg-white/90 border border-emerald-200/80 rounded-lg px-2.5 py-1 w-fit max-w-full overflow-hidden text-ellipsis">
-                <span className="text-slate-400">Spreadsheet ID:</span>
-                <span className="truncate font-bold">{SPPD_SPREADSHEET_ID} (gid: {SPPD_SPREADSHEET_GID})</span>
-              </div>
+
+            {/* Quick Action Buttons */}
+            <div className="flex items-center gap-2 shrink-0 flex-wrap self-end lg:self-center">
+              <button
+                type="button"
+                id="btn-card-sync-live-sppd"
+                onClick={() => handlePullFromSpreadsheet(false)}
+                disabled={isSyncingBridge}
+                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                title="Tarik & Perbarui Data dari Google Spreadsheet"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isSyncingBridge ? 'animate-spin' : ''}`} />
+                <span>{isSyncingBridge ? 'Sinkron...' : 'Tarik Data Live'}</span>
+              </button>
+
+              <button
+                type="button"
+                id="btn-card-push-sppd"
+                onClick={handlePushToSpreadsheet}
+                className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white hover:bg-emerald-50 text-emerald-800 px-3.5 py-2 text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+                title="Kirim / Salin Data ke Google Spreadsheet"
+              >
+                <UploadCloud className="h-3.5 w-3.5 text-emerald-600" />
+                <span>Kirim ke Sheet</span>
+              </button>
+
+              <button
+                type="button"
+                id="btn-card-manage-bridge"
+                onClick={() => setIsBridgeModalOpen(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3 py-2 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+                title="Buka Pengaturan Jembatan & Webhook"
+              >
+                <Settings2 className="h-3.5 w-3.5 text-slate-500" />
+                <span>Kelola Jembatan</span>
+              </button>
+
+              <button
+                type="button"
+                id="btn-toggle-preview-sppd-sheet"
+                onClick={() => setShowSppdSheetPreview(!showSppdSheetPreview)}
+                className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors shadow-2xs cursor-pointer ${
+                  showSppdSheetPreview
+                    ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
+                    : 'bg-white border-emerald-200 text-slate-700 hover:bg-emerald-50'
+                }`}
+                title="Tampilkan / Sembunyikan Pratinjau Google Sheets SPD"
+              >
+                <Eye className="h-3.5 w-3.5 text-emerald-600" />
+                <span>{showSppdSheetPreview ? 'Tutup Pratinjau' : 'Pratinjau Sheets'}</span>
+              </button>
+
+              <button
+                type="button"
+                id="btn-copy-sppd-spreadsheet"
+                onClick={handleCopySppdSpreadsheet}
+                className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 transition-colors shadow-2xs cursor-pointer"
+                title="Salin Link Google Spreadsheet SPD"
+              >
+                {copiedSppdSpreadsheet ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-emerald-600" />
+                    <span className="text-emerald-700 font-bold">Tersalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5 text-slate-500" />
+                    <span>Salin Link</span>
+                  </>
+                )}
+              </button>
+
+              <a
+                id="btn-open-sppd-spreadsheet-banner"
+                href={SPPD_SPREADSHEET_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
+              >
+                <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
+                <span>Buka di Google Sheets</span>
+                <ExternalLink className="h-3 w-3 text-slate-300" />
+              </a>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
-            <button
-              type="button"
-              id="btn-toggle-preview-sppd-sheet"
-              onClick={() => setShowSppdSheetPreview(!showSppdSheetPreview)}
-              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors shadow-2xs cursor-pointer ${
-                showSppdSheetPreview
-                  ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
-                  : 'bg-white border-emerald-200 text-slate-700 hover:bg-emerald-50'
-              }`}
-              title="Tampilkan / Sembunyikan Pratinjau Google Sheets SPD"
-            >
-              <Eye className="h-3.5 w-3.5 text-emerald-600" />
-              <span>{showSppdSheetPreview ? 'Tutup Pratinjau' : 'Pratinjau Sheets'}</span>
-            </button>
-            <button
-              type="button"
-              id="btn-copy-sppd-spreadsheet"
-              onClick={handleCopySppdSpreadsheet}
-              className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 transition-colors shadow-2xs cursor-pointer"
-              title="Salin Link Google Spreadsheet SPD"
-            >
-              {copiedSppdSpreadsheet ? (
-                <>
-                  <Check className="h-3.5 w-3.5 text-emerald-600" />
-                  <span className="text-emerald-700 font-bold">Tersalin!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5 text-slate-500" />
-                  <span>Salin Link</span>
-                </>
-              )}
-            </button>
-            <a
-              id="btn-open-sppd-spreadsheet-banner"
-              href={SPPD_SPREADSHEET_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
-            >
-              <FileSpreadsheet className="h-4 w-4" />
-              <span>Buka di Google Sheets</span>
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          </div>
+          {/* Sync Toast Notification Banner */}
+          {syncToast && (
+            <div className={`rounded-xl p-3 text-xs flex items-center justify-between gap-3 animate-in fade-in duration-200 ${
+              syncToast.type === 'success' 
+                ? 'bg-emerald-600 text-white shadow-sm' 
+                : syncToast.type === 'error'
+                ? 'bg-rose-600 text-white shadow-sm'
+                : 'bg-teal-700 text-white shadow-sm'
+            }`}>
+              <div className="flex items-center gap-2">
+                {syncToast.type === 'success' ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-200 shrink-0" />
+                ) : syncToast.type === 'error' ? (
+                  <AlertCircle className="h-4 w-4 text-rose-200 shrink-0" />
+                ) : (
+                  <Info className="h-4 w-4 text-teal-200 shrink-0" />
+                )}
+                <span className="font-semibold">{syncToast.message}</span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setSyncToast(null)} 
+                className="p-1 hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1480,6 +1776,24 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
         title={viewingDocs.title}
         subtitle={viewingDocs.subtitle}
         documents={viewingDocs.documents}
+      />
+
+      {/* Google Spreadsheet SPD Bridge Modal */}
+      <SppdSpreadsheetBridgeModal
+        isOpen={isBridgeModalOpen}
+        onClose={() => setIsBridgeModalOpen(false)}
+        sppdList={sppdList}
+        isSyncing={isSyncingBridge}
+        lastSyncTime={lastSyncBridgeTime}
+        syncedRowCount={syncedRowCount}
+        onPullData={() => handlePullFromSpreadsheet(false)}
+        onPushData={handlePushToSpreadsheet}
+        webhookUrl={webhookUrl}
+        onSaveWebhookUrl={handleSaveWebhookUrl}
+        autoSyncEnabled={autoSyncEnabled}
+        onToggleAutoSync={handleToggleAutoSync}
+        syncAuditLogs={syncAuditLogs}
+        onClearLogs={handleClearLogs}
       />
     </div>
   );
