@@ -367,65 +367,298 @@ export function generateCopyableSheetText(records: PerjalananDinasRecord[]): str
  */
 export function getAppsScriptBridgeCodeSnippet(): string {
   return `/**
- * JEMBATAN OTOMATIS SIMPEG BKHIT KE GOOGLE SPREADSHEET
- * Pasang di menu: Extensions > Apps Script pada Spreadsheet:
- * "1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M"
+ * ============================================================================
+ * GOOGLE APPS SCRIPT: JEMBATAN INTEGRASI SIMPEG BKHIT & SPREADSHEET SPD
+ * ============================================================================
+ * Spreadsheet ID : 1EvZNlseIxD1S6qhMG7epF4K0_22fHDA1WCgMsecWO5M
+ * Target Tab GID : 271751341
+ * Modul          : Laporan Perjalanan Dinas (SPD / SPPD)
+ * Instansi       : Balai Karantina Hewan, Ikan, dan Tumbuhan (BKHIT)
+ * ============================================================================
  */
 
-function doGet(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = getSheetByGid(271751341) || ss.getActiveSheet();
-  var data = sheet.getDataRange().getValues();
-  
-  return ContentService.createTextOutput(JSON.stringify({
-    status: 'success',
-    sheetName: sheet.getName(),
-    gid: 271751341,
-    rowCount: data.length,
-    data: data
-  })).setMimeType(ContentService.MimeType.JSON);
+// Konstanta Konfigurasi
+var CONFIG = {
+  TARGET_GID: 271751341,
+  DEFAULT_SHEET_NAME: 'SPPD_Dinas',
+  HEADERS: [
+    'Nomor SPPD & Pegawai',
+    'Kota Tujuan & Durasi',
+    'Maksud Perjalanan',
+    'Rincian Biaya',
+    'Status',
+    'Aksi / Cetak'
+  ],
+  HEADER_BG_COLOR: '#047857', // Emerald Green BKHIT
+  HEADER_FONT_COLOR: '#FFFFFF'
+};
+
+/**
+ * Menu Kustom pada Google Spreadsheet
+ */
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('📌 SIMPEG BKHIT')
+    .addItem('⚡ Inisialisasi Header & Format Tabel SPD', 'menuInitTable')
+    .addItem('📊 Hitung Rekapitulasi Anggaran', 'menuRekapAnggaran')
+    .addSeparator()
+    .addItem('🔄 Rapikan Tampilan & Lebar Kolom', 'menuFormatTable')
+    .addToUi();
 }
 
-function doPost(e) {
+/**
+ * 1. ENDPOINT GET (Untuk membaca data SPD dari Web App)
+ * URL: https://script.google.com/macros/s/.../exec
+ */
+function doGet(e) {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = getSheetByGid(271751341) || ss.getActiveSheet();
-    var payload = JSON.parse(e.postData.contents);
+    var sheet = getTargetSheet();
+    var lastRow = sheet.getLastRow();
     
-    if (payload.action === 'sync_all' && payload.rows) {
-      // Pertahankan header di baris 1
-      var lastRow = sheet.getLastRow();
-      if (lastRow > 1) {
-        sheet.getRange(2, 1, lastRow - 1, 6).clearContent();
-      }
-      if (payload.rows.length > 0) {
-        sheet.getRange(2, 1, payload.rows.length, 6).setValues(payload.rows);
-      }
-    } else if (payload.action === 'append' && payload.row) {
-      sheet.appendRow(payload.row);
+    // Jika hanya header atau kosong
+    if (lastRow < 2) {
+      return createJsonResponse({
+        status: 'success',
+        message: 'Sheet terhubung (belum ada baris data).',
+        sheetName: sheet.getName(),
+        gid: CONFIG.TARGET_GID,
+        totalRows: 0,
+        headers: CONFIG.HEADERS,
+        data: []
+      });
     }
-    
-    return ContentService.createTextOutput(JSON.stringify({
+
+    var values = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+    var formattedData = [];
+
+    for (var i = 0; i < values.length; i++) {
+      var row = values[i];
+      if (row[0] && row[0].toString().trim() !== '') {
+        formattedData.push({
+          rowNumber: i + 2,
+          nomorSppdPegawai: row[0],
+          tujuanDurasi: row[1],
+          maksudPerjalanan: row[2],
+          rincianBiaya: row[3],
+          status: row[4],
+          keterangan: row[5]
+        });
+      }
+    }
+
+    return createJsonResponse({
       status: 'success',
-      message: 'Berhasil menyinkronkan data SPD ke Google Spreadsheet!',
-      updatedAt: new Date().toISOString()
-    })).setMimeType(ContentService.MimeType.JSON);
+      sheetName: sheet.getName(),
+      gid: CONFIG.TARGET_GID,
+      totalRows: formattedData.length,
+      headers: CONFIG.HEADERS,
+      data: formattedData,
+      rawRows: values,
+      lastUpdated: new Date().toISOString()
+    });
+
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({
+    return createJsonResponse({
       status: 'error',
       message: err.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
+    });
   }
 }
 
-function getSheetByGid(targetGid) {
-  var sheets = SpreadsheetApp.getActiveSpreadsheet().getSheets();
+/**
+ * 2. ENDPOINT POST (Untuk menerima data SPD dari aplikasi SIMPEG)
+ */
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return createJsonResponse({
+        status: 'error',
+        message: 'Data payload POST kosong.'
+      });
+    }
+
+    var payload = JSON.parse(e.postData.contents);
+    var sheet = getTargetSheet();
+    var action = payload.action || 'sync_all';
+
+    // A. SINKRONISASI BATCH / MENULIS ULANG SEMUA BARIS (sync_all)
+    if (action === 'sync_all' && payload.rows) {
+      var rows = payload.rows;
+      var lastRow = sheet.getLastRow();
+
+      // Bersihkan data lama jika ada (baris 2 ke bawah)
+      if (lastRow > 1) {
+        sheet.getRange(2, 1, lastRow - 1, 6).clearContent();
+        sheet.getRange(2, 1, lastRow - 1, 6).clearFormat();
+      }
+
+      // Pastikan header baris 1 tersedia
+      ensureHeaders(sheet);
+
+      if (rows.length > 0) {
+        var range = sheet.getRange(2, 1, rows.length, 6);
+        range.setValues(rows);
+        
+        // Format styling baris data
+        range.setFontFamily('Arial');
+        range.setFontSize(10);
+        range.setVerticalAlignment('middle');
+        range.setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
+        
+        // Atur border halus
+        range.setBorder(true, true, true, true, true, true, '#CBD5E1', SpreadsheetApp.BorderStyle.SOLID);
+      }
+
+      return createJsonResponse({
+        status: 'success',
+        message: 'Berhasil menyinkronkan ' + rows.length + ' baris data SPD.',
+        rowCount: rows.length,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // B. MENAMBAHKAN SATU BARIS BARU (append)
+    if (action === 'append' && payload.row) {
+      ensureHeaders(sheet);
+      sheet.appendRow(payload.row);
+      var newLastRow = sheet.getLastRow();
+      var rowRange = sheet.getRange(newLastRow, 1, 1, 6);
+      rowRange.setFontFamily('Arial');
+      rowRange.setFontSize(10);
+      rowRange.setVerticalAlignment('middle');
+      rowRange.setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
+
+      return createJsonResponse({
+        status: 'success',
+        message: 'Berhasil menambahkan data SPD baru.',
+        rowNumber: newLastRow,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // C. MEMPERBARUI STATUS (update_status)
+    if (action === 'update_status' && payload.nomorSPD && payload.newStatus) {
+      var lastR = sheet.getLastRow();
+      var found = false;
+      if (lastR >= 2) {
+        var col1Values = sheet.getRange(2, 1, lastR - 1, 1).getValues();
+        for (var k = 0; k < col1Values.length; k++) {
+          if (col1Values[k][0] && col1Values[k][0].toString().indexOf(payload.nomorSPD) !== -1) {
+            sheet.getRange(k + 2, 5).setValue(payload.newStatus);
+            found = true;
+            break;
+          }
+        }
+      }
+
+      return createJsonResponse({
+        status: found ? 'success' : 'not_found',
+        message: found ? 'Status SPD berhasil diperbarui.' : 'Nomor SPD tidak ditemukan.'
+      });
+    }
+
+    return createJsonResponse({
+      status: 'error',
+      message: 'Aksi tidak dikenal: ' + action
+    });
+
+  } catch (err) {
+    return createJsonResponse({
+      status: 'error',
+      message: err.toString()
+    });
+  }
+}
+
+/**
+ * Mendapatkan objek Sheet berdasarkan target GID (271751341)
+ */
+function getTargetSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  
+  // 1. Cari berdasarkan GID
   for (var i = 0; i < sheets.length; i++) {
-    if (sheets[i].getSheetId() === targetGid) {
+    if (sheets[i].getSheetId() === CONFIG.TARGET_GID) {
       return sheets[i];
     }
   }
-  return null;
+
+  // 2. Cari berdasarkan Nama Sheet 'SPPD_Dinas' atau 'SPPD'
+  var byName = ss.getSheetByName(CONFIG.DEFAULT_SHEET_NAME) || ss.getSheetByName('SPPD') || ss.getSheetByName('Laporan_SPD');
+  if (byName) {
+    return byName;
+  }
+
+  // 3. Fallback ke sheet aktif pertama
+  return ss.getActiveSheet();
+}
+
+/**
+ * Memastikan header terpasang dengan benar di baris 1
+ */
+function ensureHeaders(sheet) {
+  var headerRange = sheet.getRange(1, 1, 1, CONFIG.HEADERS.length);
+  headerRange.setValues([CONFIG.HEADERS]);
+  headerRange.setBackground(CONFIG.HEADER_BG_COLOR);
+  headerRange.setFontColor(CONFIG.HEADER_FONT_COLOR);
+  headerRange.setFontWeight('bold');
+  headerRange.setFontSize(10);
+  headerRange.setHorizontalAlignment('center');
+  headerRange.setVerticalAlignment('middle');
+  sheet.setRowHeight(1, 36);
+  sheet.setFrozenRows(1);
+}
+
+/**
+ * Fungsi Menu: Inisialisasi Header & Format
+ */
+function menuInitTable() {
+  var sheet = getTargetSheet();
+  ensureHeaders(sheet);
+  menuFormatTable();
+  SpreadsheetApp.getUi().alert('Sukses', 'Format tabel Laporan SPD (gid: ' + CONFIG.TARGET_GID + ') berhasil diinisialisasi!', SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+/**
+ * Fungsi Menu: Merapikan Format & Lebar Kolom
+ */
+function menuFormatTable() {
+  var sheet = getTargetSheet();
+  sheet.setColumnWidth(1, 260); // Nomor SPPD & Pegawai
+  sheet.setColumnWidth(2, 230); // Kota Tujuan & Durasi
+  sheet.setColumnWidth(3, 260); // Maksud Perjalanan
+  sheet.setColumnWidth(4, 300); // Rincian Biaya
+  sheet.setColumnWidth(5, 140); // Status
+  sheet.setColumnWidth(6, 180); // Aksi / Cetak
+}
+
+/**
+ * Fungsi Menu: Rekapitulasi Anggaran
+ */
+function menuRekapAnggaran() {
+  var sheet = getTargetSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    SpreadsheetApp.getUi().alert('Info', 'Belum ada data perjalanan dinas untuk direkap.', SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+
+  var count = lastRow - 1;
+  SpreadsheetApp.getUi().alert(
+    'Rekapitulasi SPD',
+    'Total data tercatat: ' + count + ' berkas perjalanan dinas.\\n' +
+    'Sheet Target: ' + sheet.getName() + ' (gid: ' + sheet.getSheetId() + ')',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
+ * Helper pembungkus JSON Response
+ */
+function createJsonResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 `;
 }
