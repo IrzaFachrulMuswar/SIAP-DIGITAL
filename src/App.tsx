@@ -37,22 +37,39 @@ import {
 
 import { Navbar } from './components/Navbar';
 import { Sidebar, NavTab } from './components/Sidebar';
+import { DatabaseIntegrationNavbar } from './components/DatabaseIntegrationNavbar';
+import { SheetTabsNavbar } from './components/SheetTabsNavbar';
 import { TwoFactorModal } from './components/TwoFactorModal';
 import { SSOModal } from './components/SSOModal';
 import { SyncModal } from './components/SyncModal';
 import { NotificationDrawer } from './components/NotificationDrawer';
+import { QuickMenuEditModal } from './components/QuickMenuEditModal';
 
-// Views
+// 8 Dedicated Google Sheets Views (Sesuai Struktur 8 Sheet Database)
+import { Sheet1DataPegawaiView } from './views/sheets/Sheet1DataPegawaiView';
+import { Sheet2PengajuanCutiView } from './views/sheets/Sheet2PengajuanCutiView';
+import { Sheet3AbsensiBulananView } from './views/sheets/Sheet3AbsensiBulananView';
+import { Sheet4KgbBerkalaView } from './views/sheets/Sheet4KgbBerkalaView';
+import { Sheet5SppdDinasView } from './views/sheets/Sheet5SppdDinasView';
+import { Sheet6UangMakanView } from './views/sheets/Sheet6UangMakanView';
+import { Sheet7LemburAsnView } from './views/sheets/Sheet7LemburAsnView';
+import { Sheet8PerbendaharaanView } from './views/sheets/Sheet8PerbendaharaanView';
+
+// Standard Views
 import { DashboardView } from './views/DashboardView';
-import { PegawaiView } from './views/PegawaiView';
-import { AbsensiView } from './views/AbsensiView';
-import { KgbView } from './views/KgbView';
-import { CutiView } from './views/CutiView';
-import { KeuanganSppdView } from './views/KeuanganSppdView';
-import { PerbendaharaanView } from './views/PerbendaharaanView';
-import { UangMakanView } from './views/UangMakanView';
 import { GoogleSheetsView } from './views/GoogleSheetsView';
 import { exportEmployeeListPDF, exportToExcel } from './utils/exportUtils';
+import { 
+  fetchLiveDataPegawai, 
+  fetchLiveAbsensiBulanan, 
+  TARGET_SPREADSHEET_ID 
+} from './utils/googleSheetsLiveReader';
+import { 
+  sendToUniversalWebhook, 
+  isUniversalAutoSyncEnabled, 
+  getUniversalWebhookUrl,
+  WebhookModuleKey
+} from './utils/universalSheetWebhook';
 
 export default function App() {
   // Navigation State
@@ -130,6 +147,16 @@ export default function App() {
   const [isSSOModalOpen, setIsSSOModalOpen] = useState(false);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
+
+  // Akses Edit pada tiap-tiap menu navigation bar
+  const [isQuickEditModalOpen, setIsQuickEditModalOpen] = useState(false);
+  const [quickEditTargetTab, setQuickEditTargetTab] = useState<NavTab>('pegawai');
+  const [isEditModeActive, setIsEditModeActive] = useState(true);
+
+  const handleOpenEditModalForTab = (tab: NavTab) => {
+    setQuickEditTargetTab(tab);
+    setIsQuickEditModalOpen(true);
+  };
 
   // Real-time Notification Dispatcher
   const triggerNotification = (
@@ -237,9 +264,23 @@ export default function App() {
     setNotifications([]);
   };
 
+  // --- Helper Auto-Sync Universal Webhook Google Sheets ---
+  const triggerAutoSyncWebhook = (moduleKey: WebhookModuleKey, action: 'append' | 'update', item: any) => {
+    const url = getUniversalWebhookUrl();
+    if (!isUniversalAutoSyncEnabled() || !url || !url.startsWith('http')) return;
+    sendToUniversalWebhook({ moduleKey, action, item }).then((res) => {
+      if (!res.success) {
+        console.warn(`[UniversalWebhook] Auto-sync (${moduleKey}) ditunda:`, res.message);
+      }
+    }).catch((err) => {
+      console.warn(`[UniversalWebhook] Auto-sync (${moduleKey}) error:`, err?.message || err);
+    });
+  };
+
   // --- CRUD Handlers: Pegawai ---
   const handleAddEmployee = (emp: Employee) => {
     setEmployees((prev) => [emp, ...prev]);
+    triggerAutoSyncWebhook('pegawai', 'append', emp);
     triggerNotification(
       'Pegawai Baru Terdaftar',
       `Data pegawai ${emp.nama} (${emp.nip}) berhasil ditambahkan ke sistem.`,
@@ -251,6 +292,7 @@ export default function App() {
 
   const handleUpdateEmployee = (emp: Employee) => {
     setEmployees((prev) => prev.map((e) => (e.id === emp.id ? emp : e)));
+    triggerAutoSyncWebhook('pegawai', 'update', emp);
     triggerNotification(
       'Pembaruan Data Pegawai',
       `Data biodata/dokumen pegawai ${emp.nama} telah diperbarui.`,
@@ -275,6 +317,7 @@ export default function App() {
   // --- CRUD Handlers: Absensi ---
   const handleAddAttendance = (item: MonthlyAttendance) => {
     setAttendances((prev) => [item, ...prev]);
+    triggerAutoSyncWebhook('absensi', 'append', item);
     triggerNotification(
       'Rekap Presensi Diupload',
       `Rekap absensi bulanan periode ${item.namaBulan} telah berhasil diproses.`,
@@ -295,6 +338,7 @@ export default function App() {
   // --- CRUD Handlers: KGB ---
   const handleAddKGB = (record: KGBRecord) => {
     setKgbList((prev) => [record, ...prev]);
+    triggerAutoSyncWebhook('kgb', 'append', record);
     triggerNotification(
       'Usulan KGB Diajukan',
       `Kenaikan Gaji Berkala untuk ${record.employeeName} berhasil didaftarkan.`,
@@ -306,6 +350,7 @@ export default function App() {
 
   const handleUpdateKGB = (record: KGBRecord) => {
     setKgbList((prev) => prev.map((k) => (k.id === record.id ? record : k)));
+    triggerAutoSyncWebhook('kgb', 'update', record);
     triggerNotification(
       'Status KGB Diperbarui',
       `Usulan KGB ${record.employeeName} sekarang berstatus: ${record.status}.`,
@@ -342,6 +387,7 @@ export default function App() {
   // --- CRUD Handlers: Cuti BKN ---
   const handleAddCuti = (record: CutiBKNRecord) => {
     setCutiList((prev) => [record, ...prev]);
+    triggerAutoSyncWebhook('cuti', 'append', record);
     triggerNotification(
       'Permohonan Cuti BKN',
       `Permohonan cuti baru No: ${record.noPermohonan} (${record.jenisCuti}) diajukan oleh ${record.employeeName}.`,
@@ -353,6 +399,7 @@ export default function App() {
 
   const handleUpdateCuti = (record: CutiBKNRecord) => {
     setCutiList((prev) => prev.map((c) => (c.id === record.id ? record : c)));
+    triggerAutoSyncWebhook('cuti', 'update', record);
     triggerNotification(
       'Keputusan Cuti BKN',
       `Permohonan cuti ${record.employeeName} telah berstatus: ${record.statusFinal}.`,
@@ -389,6 +436,7 @@ export default function App() {
   // --- CRUD Handlers: SPPD ---
   const handleAddSPPD = (record: PerjalananDinasRecord) => {
     setSppdList((prev) => [record, ...prev]);
+    triggerAutoSyncWebhook('sppd', 'append', record);
     triggerNotification(
       'Penerbitan SPPD',
       `Surat Tugas & SPPD ${record.nomorSPD || record.nomorSPPD} telah dibuat.`,
@@ -400,6 +448,7 @@ export default function App() {
 
   const handleUpdateSPPD = (record: PerjalananDinasRecord) => {
     setSppdList((prev) => prev.map((s) => (s.id === record.id ? record : s)));
+    triggerAutoSyncWebhook('sppd', 'update', record);
     triggerNotification(
       'Status SPPD Diperbarui',
       `Berkas SPPD ${record.nomorSPD || record.nomorSPPD} berstatus: ${record.status}.`,
@@ -428,6 +477,7 @@ export default function App() {
   // --- CRUD Handlers: Lembur ---
   const handleAddLembur = (record: LemburRecord) => {
     setLemburList((prev) => [record, ...prev]);
+    triggerAutoSyncWebhook('lembur', 'append', record);
     triggerNotification(
       'Perintah Lembur Terbit',
       `Surat perintah lembur untuk ${record.namaPegawai || record.employeeName} telah diajukan.`,
@@ -439,6 +489,7 @@ export default function App() {
 
   const handleUpdateLembur = (record: LemburRecord) => {
     setLemburList((prev) => prev.map((l) => (l.id === record.id ? record : l)));
+    triggerAutoSyncWebhook('lembur', 'update', record);
   };
 
   const handleDeleteLembur = (id: string) => {
@@ -448,6 +499,7 @@ export default function App() {
   // --- CRUD Handlers: Perbendaharaan ---
   const handleAddPerbendaharaan = (record: PerbendaharaanRecord) => {
     setPerbendaharaanList((prev) => [record, ...prev]);
+    triggerAutoSyncWebhook('perbendaharaan', 'append', record);
     triggerNotification(
       'Dokumen Pembayaran Kas Terbit',
       `Dokumen ${record.jenis} (${record.nomorDokumen}) berhasil diterbitkan.`,
@@ -459,6 +511,7 @@ export default function App() {
 
   const handleUpdatePerbendaharaan = (record: PerbendaharaanRecord) => {
     setPerbendaharaanList((prev) => prev.map((p) => (p.id === record.id ? record : p)));
+    triggerAutoSyncWebhook('perbendaharaan', 'update', record);
     triggerNotification(
       'Pencairan Anggaran Kas',
       `Dokumen ${record.nomorDokumen} berstatus: ${record.status}.`,
@@ -475,6 +528,7 @@ export default function App() {
   // --- CRUD Handlers: Uang Makan Pegawai ASN (Rekapan Per Bulan) ---
   const handleAddUangMakan = (record: UangMakanRecord) => {
     setUangMakanList((prev) => [record, ...prev]);
+    triggerAutoSyncWebhook('uang_makan', 'append', record);
     triggerNotification(
       'Rekapitulasi Uang Makan',
       `Rekapan uang makan periode ${record.bulan} berhasil ditambahkan ke sistem.`,
@@ -486,6 +540,7 @@ export default function App() {
 
   const handleUpdateUangMakan = (record: UangMakanRecord) => {
     setUangMakanList((prev) => prev.map((u) => (u.id === record.id ? record : u)));
+    triggerAutoSyncWebhook('uang_makan', 'update', record);
     triggerNotification(
       'Pembaruan Uang Makan',
       `Rekapan uang makan periode ${record.bulan} diperbarui (Status: ${record.status}).`,
@@ -504,9 +559,45 @@ export default function App() {
   const pendingCutiCount = cutiList.filter((c) => c.statusFinal.includes('Menunggu')).length;
   const pendingKgbCount = kgbList.filter((k) => k.status === 'Menunggu Verifikasi' || k.status === 'Diverifikasi').length;
 
+  // Live Refresh State for Read-Only Sheets (Sheet 1 & 3)
+  const [isRefreshingLive, setIsRefreshingLive] = useState(false);
+
+  const handleRefreshLiveSheets = async () => {
+    setIsRefreshingLive(true);
+    try {
+      const [resPegawai, resAbsensi] = await Promise.all([
+        fetchLiveDataPegawai(TARGET_SPREADSHEET_ID),
+        fetchLiveAbsensiBulanan(TARGET_SPREADSHEET_ID),
+      ]);
+      setEmployees(resPegawai.rows);
+      setLastSyncTime(new Date().toLocaleTimeString('id-ID'));
+      triggerNotification(
+        'Sinkronisasi Live Sheet',
+        `Berhasil membaca data langsung: ${resPegawai.rowCount} Pegawai dan ${resAbsensi.rowCount} Log Presensi dari Google Spreadsheet.`,
+        'SINKRONISASI',
+        'success',
+        'sheets_db'
+      );
+    } catch (err: any) {
+      console.error('Error refreshing live sheets:', err);
+    } finally {
+      setIsRefreshingLive(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F1F5F9] flex flex-col font-sans text-slate-800 antialiased selection:bg-indigo-600 selection:text-white">
-      {/* Top Fixed Header Navbar */}
+      {/* 1. NAVBAR KHUSUS INTEGRASI DATABASE (TERPISAH DARI SEMUA NAVBAR) */}
+      <DatabaseIntegrationNavbar
+        onOpenDatabaseManager={() => setCurrentTab('sheets_db')}
+        onRefreshLiveSheets={handleRefreshLiveSheets}
+        onOpenEditModal={handleOpenEditModalForTab}
+        isRefreshing={isRefreshingLive}
+        lastSyncTime={lastSyncTime}
+        currentTab={currentTab}
+      />
+
+      {/* 2. Top Header Navbar (Profil, SSO, 2FA, Search & Quick Export) */}
       <Navbar
         currentSession={currentUser}
         unreadNotifsCount={unreadNotifsCount}
@@ -514,6 +605,7 @@ export default function App() {
         onOpenSSO={() => setIsSSOModalOpen(true)}
         onOpenSync={() => setIsSyncModalOpen(true)}
         onOpenSheetsDB={() => setCurrentTab('sheets_db')}
+        onOpenQuickEdit={() => handleOpenEditModalForTab(currentTab)}
         onOpen2FA={() => {
           setPending2FAAction(null);
           setIs2FAModalOpen(true);
@@ -523,6 +615,15 @@ export default function App() {
         onQuickExport={handleQuickExport}
         searchQuery={globalSearch}
         setSearchQuery={setGlobalSearch}
+      />
+
+      {/* 3. NAVBAR NAVIGASI KHUSUS 8 SHEET SPREADSHEET (BACA SHEET & INPUT DATA) */}
+      <SheetTabsNavbar
+        currentTab={currentTab}
+        onSelectTab={(tab) => setCurrentTab(tab)}
+        onOpenEditModal={handleOpenEditModalForTab}
+        isEditModeActive={isEditModeActive}
+        onToggleEditMode={() => setIsEditModeActive((prev) => !prev)}
       />
 
       {/* Main App Layout */}
@@ -539,6 +640,7 @@ export default function App() {
               setCurrentTab(tab);
             }
           }}
+          onOpenEditModal={handleOpenEditModalForTab}
           counts={{
             totalPegawai: employees.length,
             cutiPending: pendingCutiCount,
@@ -551,7 +653,8 @@ export default function App() {
 
         {/* Center Content Area & Sleek Footer */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
+          <main className="flex-1 overflow-y-auto p-3 md:p-6 lg:p-8 space-y-6">
+            {/* Dasbor Eksekutif Utama */}
             {currentTab === 'dashboard' && (
               <DashboardView
                 employees={employees}
@@ -565,95 +668,56 @@ export default function App() {
               />
             )}
 
+            {/* SHEET 1: DATA PEGAWAI (MODE: BACA LANGSUNG DARI SHEET) */}
             {currentTab === 'pegawai' && (
-              <PegawaiView
-                employees={employees}
-                onAddEmployee={handleAddEmployee}
-                onUpdateEmployee={handleUpdateEmployee}
-                onDeleteEmployee={handleDeleteEmployee}
-                onRequest2FA={handleRequest2FA}
-                onImportEmployeesFromSheet={(imported) => {
-                  setEmployees(imported);
-                  triggerNotification(
-                    'Sinkronisasi Pegawai & Dokumen',
-                    `Berhasil menyinkronkan ${imported.length} data pegawai dan berkas Google Drive dari Google Spreadsheet.`,
-                    'KEPEGAWAIAN',
-                    'success',
-                    'pegawai'
-                  );
-                }}
-              />
+              <Sheet1DataPegawaiView />
             )}
 
-            {currentTab === 'absensi' && (
-              <AbsensiView
-                attendances={attendances}
-                onAddAttendance={handleAddAttendance}
-                onUpdateAttendance={handleUpdateAttendance}
-                onDeleteAttendance={handleDeleteAttendance}
-              />
-            )}
-
-            {currentTab === 'kgb' && (
-              <KgbView
-                kgbList={kgbList}
-                employees={employees}
-                onAddKGB={handleAddKGB}
-                onUpdateKGB={handleUpdateKGB}
-                onDeleteKGB={handleDeleteKGB}
-                onRequest2FA={handleRequest2FA}
-              />
-            )}
-
+            {/* SHEET 2: PENGAJUAN CUTI (MODE: INPUT DATA) */}
             {currentTab === 'cuti' && (
-              <CutiView
+              <Sheet2PengajuanCutiView
                 cutiList={cutiList}
-                employees={employees}
                 onAddCuti={handleAddCuti}
-                onUpdateCuti={handleUpdateCuti}
-                onDeleteCuti={handleDeleteCuti}
-                onRequest2FA={handleRequest2FA}
               />
             )}
 
-            {(currentTab === 'sppd' || currentTab === 'lembur') && (
-              <KeuanganSppdView
-                initialTab={currentTab === 'lembur' ? 'lembur' : 'sppd'}
+            {/* SHEET 3: ABSENSI BULANAN (MODE: BACA LANGSUNG DARI SHEET) */}
+            {currentTab === 'absensi' && (
+              <Sheet3AbsensiBulananView />
+            )}
+
+            {/* SHEET 4: KGB BERKALA (MODE: INPUT DATA) */}
+            {currentTab === 'kgb' && (
+              <Sheet4KgbBerkalaView
+                kgbList={kgbList}
+                onAddKgb={handleAddKGB}
+              />
+            )}
+
+            {/* SHEET 5: SPPD DINAS (MODE: INPUT DATA) */}
+            {currentTab === 'sppd' && (
+              <Sheet5SppdDinasView
                 sppdList={sppdList}
-                lemburList={lemburList}
-                employees={employees}
-                onAddSPPD={handleAddSPPD}
-                onUpdateSPPD={handleUpdateSPPD}
-                onDeleteSPPD={handleDeleteSPPD}
-                onBatchSyncSPPD={handleBatchSyncSPPD}
-                onAddLembur={handleAddLembur}
-                onUpdateLembur={handleUpdateLembur}
-                onDeleteLembur={handleDeleteLembur}
-                onRequest2FA={handleRequest2FA}
+                onAddSppd={handleAddSPPD}
               />
             )}
 
-            {currentTab === 'perbendaharaan' && (
-              <PerbendaharaanView
-                records={perbendaharaanList}
-                onAddRecord={handleAddPerbendaharaan}
-                onUpdateRecord={handleUpdatePerbendaharaan}
-                onDeleteRecord={handleDeletePerbendaharaan}
-                onRequest2FA={handleRequest2FA}
-              />
-            )}
-
+            {/* SHEET 6: UANG MAKAN (MODE: INPUT DATA) */}
             {currentTab === 'uang_makan' && (
-              <UangMakanView
-                records={uangMakanList}
-                employees={employees}
-                onAddRecord={handleAddUangMakan}
-                onUpdateRecord={handleUpdateUangMakan}
-                onDeleteRecord={handleDeleteUangMakan}
-                onRequest2FA={handleRequest2FA}
-              />
+              <Sheet6UangMakanView />
             )}
 
+            {/* SHEET 7: LEMBUR ASN (MODE: INPUT DATA) */}
+            {currentTab === 'lembur' && (
+              <Sheet7LemburAsnView />
+            )}
+
+            {/* SHEET 8: PERBENDAHARAAN (MODE: INPUT DATA) */}
+            {currentTab === 'perbendaharaan' && (
+              <Sheet8PerbendaharaanView />
+            )}
+
+            {/* INTEGRASI DATABASE GOOGLE SHEETS & APPS SCRIPT CODE.GS */}
             {currentTab === 'sheets_db' && (
               <GoogleSheetsView
                 employees={employees}
@@ -737,6 +801,25 @@ export default function App() {
           setCurrentTab(tab as NavTab);
           setIsNotifDrawerOpen(false);
         }}
+      />
+
+      {/* Universal Quick Menu Edit Modal (Akses Edit pada tiap-tiap menu navigation bar) */}
+      <QuickMenuEditModal
+        isOpen={isQuickEditModalOpen}
+        onClose={() => setIsQuickEditModalOpen(false)}
+        targetTab={quickEditTargetTab}
+        onNavigateTab={(tab) => {
+          setCurrentTab(tab);
+          setIsQuickEditModalOpen(false);
+        }}
+        onAddEmployee={handleAddEmployee}
+        onAddCuti={handleAddCuti}
+        onAddAttendance={handleAddAttendance}
+        onAddKgb={handleAddKGB}
+        onAddSppd={handleAddSPPD}
+        onAddUangMakan={handleAddUangMakan}
+        onAddLembur={handleAddLembur}
+        onAddPerbendaharaan={handleAddPerbendaharaan}
       />
     </div>
   );

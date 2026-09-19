@@ -3,27 +3,32 @@ import {
   LayoutDashboard, 
   Users, 
   CalendarCheck, 
-  BadgePercent, 
   FileText, 
+  TrendingUp, 
   FileSpreadsheet, 
+  UtensilsCrossed, 
   Clock, 
-  WalletCards, 
+  Coins, 
   Shield, 
   Database,
   ChevronRight,
-  TrendingUp,
-  UtensilsCrossed
+  Eye,
+  PenTool,
+  Pencil,
+  Settings2,
+  ExternalLink
 } from 'lucide-react';
+import { TARGET_SPREADSHEET_ID } from '../utils/googleSheetsLiveReader';
 
 export type NavTab = 
   | 'dashboard'
   | 'pegawai'
+  | 'cuti'
   | 'absensi'
   | 'kgb'
-  | 'cuti'
   | 'sppd'
-  | 'lembur'
   | 'uang_makan'
+  | 'lembur'
   | 'perbendaharaan'
   | 'sheets_db'
   | 'sync'
@@ -32,6 +37,7 @@ export type NavTab =
 interface SidebarProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
+  onOpenEditModal?: (tab: NavTab) => void;
   counts: {
     totalPegawai: number;
     cutiPending: number;
@@ -45,118 +51,129 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   onSelectTab,
+  onOpenEditModal,
   counts,
   isMobileOpen,
   onCloseMobile,
 }) => {
-  const navItems = [
+  const navSections = [
     {
-      group: 'UTAMA',
+      group: 'IKHTISAR UTAMA',
       items: [
         {
           id: 'dashboard' as NavTab,
-          label: 'Dasbor Rekapitulasi',
+          label: 'Dasbor Eksekutif',
+          subtitle: 'Rekapitulasi Semua Modul',
           icon: LayoutDashboard,
           badge: null,
-          color: 'text-blue-600',
+          color: 'text-blue-400',
         },
       ],
     },
     {
-      group: '1. MODUL KEPEGAWAIAN',
+      group: '8 SHEET DATABASE GOOGLE',
       items: [
         {
           id: 'pegawai' as NavTab,
-          label: 'Daftar Pegawai & Dokumen',
+          label: '1. Data Pegawai',
+          subtitle: '9 Kolom Pegawai ASN',
           icon: Users,
+          mode: 'edit',
+          modeLabel: 'Akses Edit',
           badge: `${counts.totalPegawai}`,
-          color: 'text-sky-600',
-        },
-        {
-          id: 'absensi' as NavTab,
-          label: 'Rekap Absensi Bulanan',
-          icon: CalendarCheck,
-          badge: 'Bulanan',
-          color: 'text-indigo-600',
-        },
-        {
-          id: 'kgb' as NavTab,
-          label: 'Kenaikan Gaji Berkala (KGB)',
-          icon: TrendingUp,
-          badge: counts.kgbPending > 0 ? `${counts.kgbPending}` : null,
-          badgeColor: 'bg-amber-100 text-amber-800',
-          color: 'text-emerald-600',
+          color: 'text-sky-400',
         },
         {
           id: 'cuti' as NavTab,
-          label: 'Pengajuan Cuti (BKN 24/2017)',
+          label: '2. Pengajuan Cuti',
+          subtitle: '9 Kolom BKN 24/2017',
           icon: FileText,
+          mode: 'edit',
+          modeLabel: 'Akses Edit',
           badge: counts.cutiPending > 0 ? `${counts.cutiPending} Baru` : null,
-          badgeColor: 'bg-rose-100 text-rose-800',
-          color: 'text-rose-600',
+          color: 'text-rose-400',
         },
-      ],
-    },
-    {
-      group: '2. MODUL KEUANGAN',
-      items: [
+        {
+          id: 'absensi' as NavTab,
+          label: '3. Absensi Bulanan',
+          subtitle: '17 Kolom Presensi',
+          icon: CalendarCheck,
+          mode: 'edit',
+          modeLabel: 'Akses Edit',
+          badge: 'Live Sheet',
+          color: 'text-indigo-400',
+        },
+        {
+          id: 'kgb' as NavTab,
+          label: '4. KGB Berkala',
+          subtitle: '6 Kolom Kenaikan Gaji',
+          icon: TrendingUp,
+          mode: 'edit',
+          modeLabel: 'Akses Edit',
+          badge: counts.kgbPending > 0 ? `${counts.kgbPending}` : null,
+          color: 'text-emerald-400',
+        },
         {
           id: 'sppd' as NavTab,
-          label: 'Laporan Perjalanan Dinas (SPD)',
+          label: '5. SPPD Dinas',
+          subtitle: '6 Kolom Perjalanan Dinas',
           icon: FileSpreadsheet,
+          mode: 'edit',
+          modeLabel: 'Akses Edit',
           badge: null,
-          color: 'text-cyan-600',
-        },
-        {
-          id: 'lembur' as NavTab,
-          label: 'Rekap Absen & Laporan Lembur',
-          icon: Clock,
-          badge: null,
-          color: 'text-violet-600',
+          color: 'text-cyan-400',
         },
         {
           id: 'uang_makan' as NavTab,
-          label: 'Uang Makan Pegawai',
+          label: '6. Uang Makan',
+          subtitle: '8 Kolom Rekapitulasi',
           icon: UtensilsCrossed,
+          mode: 'edit',
+          modeLabel: 'Akses Edit',
           badge: null,
-          color: 'text-amber-600',
+          color: 'text-amber-400',
+        },
+        {
+          id: 'lembur' as NavTab,
+          label: '7. Lembur ASN',
+          subtitle: '5 Kolom Surat Perintah Lembur',
+          icon: Clock,
+          mode: 'edit',
+          modeLabel: 'Akses Edit',
+          badge: null,
+          color: 'text-violet-400',
         },
         {
           id: 'perbendaharaan' as NavTab,
-          label: 'SPP, SPM & SP2D Kas',
-          icon: WalletCards,
-          badge: `${counts.sp2dCount} Berkas`,
-          badgeColor: 'bg-emerald-100 text-emerald-800',
-          color: 'text-emerald-600',
+          label: '8. Perbendaharaan',
+          subtitle: '6 Kolom SPP, SPM, SP2D',
+          icon: Coins,
+          mode: 'edit',
+          modeLabel: 'Akses Edit',
+          badge: `${counts.sp2dCount}`,
+          color: 'text-teal-400',
         },
       ],
     },
     {
-      group: 'SISTEM & INTEGRASI',
+      group: 'NAVBAR INTEGRASI DATABASE',
       items: [
         {
           id: 'sheets_db' as NavTab,
-          label: 'Database Google Sheets',
-          icon: FileSpreadsheet,
-          badge: 'Live DB',
-          badgeColor: 'bg-emerald-100 text-emerald-800',
-          color: 'text-emerald-600',
-        },
-        {
-          id: 'sync' as NavTab,
-          label: 'Sinkronisasi SIMPEG SDM',
+          label: 'Konfigurasi Database & Webhook',
+          subtitle: 'Apps Script Code.gs API',
           icon: Database,
-          badge: 'Otomatis',
-          badgeColor: 'bg-teal-100 text-teal-800',
-          color: 'text-teal-600',
+          badge: 'API Active',
+          badgeColor: 'bg-emerald-500/20 text-emerald-300',
+          color: 'text-emerald-400',
         },
         {
           id: 'keamanan' as NavTab,
-          label: 'Autentikasi 2FA & SSO',
+          label: 'Autentikasi & Keamanan',
+          subtitle: '2FA & Proteksi Data',
           icon: Shield,
           badge: 'Aktif',
-          badgeColor: 'bg-blue-100 text-blue-800',
-          color: 'text-blue-600',
+          color: 'text-blue-400',
         },
       ],
     },
@@ -174,30 +191,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 md:w-64 bg-[#1E293B] text-slate-300 flex flex-col transition-transform duration-300 md:translate-x-0 md:static md:z-20 border-r border-slate-700/50 ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 md:w-64 bg-[#0F172A] text-slate-300 flex flex-col transition-transform duration-300 md:translate-x-0 md:static md:z-20 border-r border-slate-800 ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Sidebar Header Brand */}
-        <div className="p-5 md:p-6 flex items-center gap-3 border-b border-slate-700/50">
-          <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center font-bold text-white text-xs shadow-lg shadow-indigo-500/20 shrink-0">
+        <div className="p-4 md:p-5 flex items-center gap-3 border-b border-slate-800 bg-slate-950/60">
+          <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center font-bold text-white text-xs shadow-md shadow-emerald-600/30 shrink-0">
             SIM
           </div>
           <div className="min-w-0">
-            <span className="text-white font-semibold tracking-tight text-base truncate block">
-              E-Aparatur v2.1
+            <span className="text-white font-semibold tracking-tight text-sm truncate block">
+              SIM BKHIT Sorong
             </span>
-            <p className="text-[10px] text-slate-400 font-mono tracking-wider truncate">
-              BKN & KEMENKEU
+            <p className="text-[10px] text-emerald-400 font-mono truncate">
+              Google Sheets 8-Sheet DB
             </p>
           </div>
         </div>
 
         {/* Navigation Menu */}
-        <nav className="flex-1 py-4 overflow-y-auto space-y-5">
-          {navItems.map((group) => (
+        <nav className="flex-1 py-3 overflow-y-auto space-y-4 no-scrollbar">
+          {navSections.map((group) => (
             <div key={group.group}>
-              <div className="px-4 mb-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+              <div className="px-4 mb-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
                 {group.group}
               </div>
               <div className="space-y-0.5">
@@ -213,34 +230,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         onSelectTab(item.id);
                         onCloseMobile();
                       }}
-                      className={`w-full flex items-center justify-between px-4 py-2.5 text-xs font-medium transition-all group cursor-pointer text-left ${
+                      className={`w-full flex items-center justify-between px-3.5 py-2 text-xs transition-all group cursor-pointer text-left border-l-2 ${
                         isActive
-                          ? 'bg-indigo-600/10 border-r-4 border-indigo-500 text-indigo-400 font-medium'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                          ? 'bg-emerald-500/10 border-emerald-400 text-white font-semibold'
+                          : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                       }`}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <Icon
                           className={`h-4 w-4 shrink-0 transition-colors ${
-                            isActive ? 'text-indigo-400' : 'text-slate-400 group-hover:text-white'
+                            isActive ? 'text-emerald-400' : 'text-slate-400 group-hover:text-slate-200'
                           }`}
                         />
-                        <span className="truncate">{item.label}</span>
+                        <div className="min-w-0">
+                          <span className="truncate block leading-tight">{item.label}</span>
+                          {item.subtitle && (
+                            <span className="text-[10px] text-slate-400 truncate block font-normal leading-tight">
+                              {item.subtitle}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                        {item.badge && (
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              isActive
-                                ? 'bg-indigo-500/20 text-indigo-300'
-                                : 'bg-slate-800 text-slate-400 group-hover:text-slate-300'
-                            }`}
-                          >
-                            {item.badge}
+                      <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                        {(item as any).badge && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-800 text-slate-300">
+                            {(item as any).badge}
                           </span>
                         )}
-                        {isActive && <ChevronRight className="h-3.5 w-3.5 opacity-80" />}
+                        {isActive && <ChevronRight className="h-3.5 w-3.5 text-emerald-400 shrink-0" />}
                       </div>
                     </button>
                   );
@@ -250,18 +268,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ))}
         </nav>
 
-        {/* Bottom System & Profile Bar */}
-        <div className="p-4 border-t border-slate-700/50 bg-slate-900/50">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center font-bold text-white text-xs shrink-0">
-              AD
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-xs font-semibold text-white truncate">Admin SDM Pusat</p>
-              <p className="text-[10px] text-emerald-400 flex items-center gap-1.5 font-medium">
-                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
-                SSO Connected
-              </p>
+        {/* Bottom Bar */}
+        <div className="p-3 border-t border-slate-800 bg-slate-950/80">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-full bg-emerald-900/60 border border-emerald-700/60 flex items-center justify-center font-bold text-emerald-300 text-xs shrink-0">
+                DB
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold text-white truncate">Google Sheets Active</p>
+                <p className="text-[9px] text-emerald-400 flex items-center gap-1 font-mono truncate">
+                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                  Connected: 8 Sheets
+                </p>
+              </div>
             </div>
           </div>
         </div>

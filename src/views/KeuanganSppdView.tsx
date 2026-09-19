@@ -41,6 +41,7 @@ import { formatRupiah, exportSPPDPDF, exportToExcel } from '../utils/exportUtils
 import { FileUploadZone } from '../components/FileUploadZone';
 import { DocumentViewerModal } from '../components/DocumentViewerModal';
 import { SppdSpreadsheetBridgeModal, SyncAuditLogItem } from '../components/SppdSpreadsheetBridgeModal';
+import { sendToUniversalWebhook } from '../utils/universalSheetWebhook';
 import {
   SPPD_SPREADSHEET_ID,
   SPPD_SPREADSHEET_GID,
@@ -219,22 +220,31 @@ export const KeuanganSppdView: React.FC<KeuanganSppdViewProps> = ({
     if (webhookUrl && webhookUrl.startsWith('http')) {
       try {
         const rows = formatSPPDListForSheet(sppdList);
-        const res = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'sync_all', rows })
+        const result = await sendToUniversalWebhook({
+          moduleKey: 'sppd',
+          action: 'sync_all',
+          overrideWebhookUrl: webhookUrl,
+          customRows: rows,
         });
-        const json = await res.json();
-        addAuditLog('Kirim ke Webhook', sppdList.length, 'SUCCESS', `Tersinkron ke Apps Script Webhook: ${json.message || 'OK'}`);
-        setSyncToast({
-          type: 'success',
-          message: `Sukses mengirim ${sppdList.length} data SPD langsung ke Google Spreadsheet via Webhook!`
-        });
+
+        if (result.success) {
+          addAuditLog('Kirim ke Webhook', sppdList.length, 'SUCCESS', `Tersinkron ke Apps Script Webhook: ${result.message}`);
+          setSyncToast({
+            type: 'success',
+            message: `Sukses mengirim ${sppdList.length} data SPD langsung ke Google Spreadsheet via Webhook!`
+          });
+        } else {
+          addAuditLog('Kirim ke Webhook Gagal', 0, 'ERROR', result.message);
+          setSyncToast({
+            type: 'error',
+            message: `${result.message}. Menggunakan metode salin format.`
+          });
+        }
       } catch (e: any) {
-        addAuditLog('Kirim ke Webhook Gagal', 0, 'ERROR', e.message);
+        addAuditLog('Kirim ke Webhook Gagal', 0, 'ERROR', e.message || 'Gagal mengirim data');
         setSyncToast({
           type: 'error',
-          message: `Gagal mengirim ke Webhook: ${e.message}. Menggunakan metode salin format.`
+          message: `Gagal mengirim ke Webhook: ${e.message || 'Koneksi terputus'}. Menggunakan metode salin format.`
         });
       } finally {
         setTimeout(() => setSyncToast(null), 4000);

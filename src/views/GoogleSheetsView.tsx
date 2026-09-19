@@ -48,6 +48,7 @@ import {
   formatAttendanceForSheet
 } from '../utils/googleSheetsService';
 import { Employee, CutiBKNRecord, KGBRecord, MonthlyAttendance, PerjalananDinasRecord } from '../types';
+import { UniversalWebhookManager } from '../components/UniversalWebhookManager';
 
 interface GoogleSheetsViewProps {
   employees: Employee[];
@@ -921,6 +922,23 @@ export const GoogleSheetsView: React.FC<GoogleSheetsViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Universal Webhook Router Component */}
+      <UniversalWebhookManager
+        spreadsheetId={dbState.spreadsheetId}
+        employees={employees}
+        cutiList={cutiList}
+        kgbList={kgbList}
+        attendances={attendances}
+        sppdList={sppdList}
+        onNotify={(title, message, type) => {
+          if (type === 'error') {
+            setAuthError(message);
+          } else {
+            setSyncSuccessMsg(message);
+          }
+        }}
+      />
 
       {/* Main Database Table Explorer (Terbaca di Tampilan Preview) */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">

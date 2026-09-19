@@ -123,6 +123,24 @@ export const INITIAL_SHEETS_DATABASE: GoogleSheetsDatabaseState = {
       ],
       updatedAt: '15 September 2026 09:00 WIT',
     },
+    Lembur_ASN: {
+      sheetName: 'Lembur_ASN',
+      headers: ['Nomor Surat Lembur', 'NIP', 'Nama Pegawai', 'Tanggal Lembur', 'Jam Mulai - Selesai', 'Total Jam', 'Total Uang Lembur', 'Uraian Tugas', 'Status'],
+      rows: [
+        ['SPKL-2026-08-01', '19850714 201001 1 003', 'Rahmat Hidayat, M.T.', '2026-08-15', '17:00 - 21:00', '4 Jam', 'Rp 140.000', 'Penyusunan Backup Database SIMPEG', 'Telah Dibayarkan'],
+        ['SPKL-2026-08-02', '19920315 201802 2 004', 'Siti Nurhaliza, S.E.', '2026-08-20', '17:00 - 20:00', '3 Jam', 'Rp 105.000', 'Verifikasi Berkas Kenaikan Pangkat BKN', 'Disetujui PPK'],
+      ],
+      updatedAt: '15 September 2026 09:00 WIT',
+    },
+    Perbendaharaan: {
+      sheetName: 'Perbendaharaan',
+      headers: ['Nomor Dokumen', 'Jenis Pembayaran', 'Tipe Pembayaran', 'Tanggal Terbit', 'Nama Penerima / Rekening', 'Jumlah Nominal', 'Uraian Pengeluaran', 'Status SP2D'],
+      rows: [
+        ['SP2D-2026-09-001', 'SP2D', 'LS (Langsung)', '2026-09-05', 'Rekening Bendahara Pengeluaran (Bank Mandiri)', 'Rp 45.850.000', 'Pembayaran Uang Makan ASN Periode Agustus 2026', 'SP2D Terbit / Cair'],
+        ['SPM-2026-09-012', 'SPM', 'UP (Uang Persediaan)', '2026-09-10', 'Pelaksana SPD (Bank BNI)', 'Rp 12.450.000', 'Biaya Riil Perjalanan Dinas Pengawasan Karantina', 'Diajukan ke KPPN'],
+      ],
+      updatedAt: '15 September 2026 09:00 WIT',
+    },
   },
 };
 

@@ -10,7 +10,8 @@ import {
   Search,
   CheckCircle2,
   Lock,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Pencil
 } from 'lucide-react';
 import { UserSession } from '../types';
 

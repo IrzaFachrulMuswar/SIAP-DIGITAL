@@ -65,18 +65,20 @@ export interface Employee {
   email: string;
   telepon: string;
   alamat: string;
-  tmtPNS: string;
+  tmtPNS?: string;
   jenisKelamin: 'Laki-laki' | 'Perempuan';
+  tempatLahir?: string;
+  agama?: string;
   tanggalLahir: string;
   pendidikanTerakhir: string;
   gajiPokok: number;
   fotoUrl?: string;
-  dokumen: EmployeeDocument[];
+  dokumen?: EmployeeDocument[];
   sisaCutiN: number;
   sisaCutiN1: number;
   sisaCutiN2: number;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
   // Google Spreadsheet integrations
   linkDrive?: string;
   satuanPelayanan?: string;
@@ -108,6 +110,32 @@ export interface MonthlyAttendance {
   catatan?: string;
 }
 
+/**
+ * Record Presensi Harian / Absensi Bulanan Sheet 3
+ * Header Google Spreadsheet:
+ * NO | Unit Kerja | Nama Pegawai | NIP Pegawai | Hari | Tgl Presensi | Tgl Aktual | Presensi Masuk | Batas Presensi Masuk | Presensi Pulang | Batas Presensi Pulang | Terlambat (Menit) | Pulang Sebelum Waktu (Menit) | Jumlah (Menit) | O/A | Lokasi | Status
+ */
+export interface DailyAttendanceRecord {
+  id?: string;
+  no: number | string;
+  unitKerja: string;
+  namaPegawai: string;
+  nipPegawai: string;
+  hari: string;
+  tglPresensi: string;
+  tglAktual: string;
+  presensiMasuk: string;
+  batasPresensiMasuk: string;
+  presensiPulang: string;
+  batasPresensiPulang: string;
+  terlambatMenit: number;
+  pulangSebelumWaktuMenit: number;
+  jumlahMenit: number;
+  oa: string; // 'O' | 'A' | '-'
+  lokasi: string;
+  status: string; // 'Hadir' | 'Terlambat' | 'Izin' | 'Sakit' | 'Cuti' | 'Dinas Luar' | 'Alpha'
+}
+
 export type StatusKGB = 'Menunggu Verifikasi' | 'Diverifikasi' | 'SK Diterbitkan' | 'Ditolak';
 
 export interface KGBRecord {
@@ -133,6 +161,11 @@ export interface KGBRecord {
   dokumenSKUrl?: string;
   dokumenSKName?: string;
   updatedAt: string;
+  // Aliases for 6-column sheet compatibility
+  tmtBaru?: string;
+  gajiPokokLama?: number;
+  gajiPokokBaru?: number;
+  suratKeputusanTerakhir?: string;
 }
 
 export type StatusKP = 'Berkas Diupload' | 'Verifikasi BKD/Biro SDM' | 'Persetujuan Teknis BKN' | 'SK Diterbitkan' | 'Ditolak';
@@ -224,6 +257,7 @@ export interface CutiBKNRecord {
     fileData?: string;
   };
   statusFinal: 'Menunggu Atasan' | 'Menunggu Pejabat' | 'Disetujui' | 'Ditolak' | 'Ditangguhkan';
+  linkPermohonanCuti?: string;
   updatedAt: string;
 }
 

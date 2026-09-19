@@ -13,9 +13,16 @@ export const formatRupiah = (value: number): string => {
   }).format(value);
 };
 
-// EXPORT TO EXCEL GENUINE .XLSX
-export const exportToExcel = (data: Record<string, any>[], sheetName: string, fileName: string) => {
+// EXPORT TO EXCEL GENUINE .XLSX (Mendukung 2 atau 3 parameter)
+export const exportToExcel = (
+  data: Record<string, any>[], 
+  sheetOrFileName: string, 
+  fileNameParam?: string
+) => {
   try {
+    const sheetName = fileNameParam ? sheetOrFileName : 'Sheet1';
+    const fileName = fileNameParam || sheetOrFileName;
+
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
@@ -28,7 +35,7 @@ export const exportToExcel = (data: Record<string, any>[], sheetName: string, fi
     }
     worksheet['!cols'] = colWidths;
 
-    XLSX.writeFile(workbook, `${fileName}.xlsx`);
+    XLSX.writeFile(workbook, `${fileName.endsWith('.xlsx') ? fileName : `${fileName}.xlsx`}`);
   } catch (err) {
     console.error('Gagal mengekspor data ke Excel:', err);
   }
